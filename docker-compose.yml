@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: tenant_alert_postgres
+    environment:
+      POSTGRES_USER: tenant_alert
+      POSTGRES_PASSWORD: tenant_alert
+      POSTGRES_DB: tenant_alert
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  dagster_webserver:
+    image: python:3.11-slim
+    container_name: tenant_alert_dagster_web
+    working_dir: /app
+    command: >
+      bash -lc "pip install -r requirements/base.txt &&
+      dagster-webserver -h 0.0.0.0 -p 3000 -w dagster_project/workspace.yaml"
+    volumes:
+      - ./:/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+
+  dagster_daemon:
+    image: python:3.11-slim
+    container_name: tenant_alert_dagster_daemon
+    working_dir: /app
+    command: >
+      bash -lc "pip install -r requirements/base.txt &&
+      dagster-daemon run"
+    volumes:
+      - ./:/app
+    depends_on:
+      - dagster_webserver
+
+volumes:
+  postgres_data:

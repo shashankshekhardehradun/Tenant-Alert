@@ -1,0 +1,6 @@
+-r base.txt
+pytest
+pytest-cov
+ruff
+mypy
+types-python-dateutil
