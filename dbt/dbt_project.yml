@@ -1,0 +1,21 @@
+name: tenant_alert
+version: 1.0.0
+config-version: 2
+
+profile: tenant_alert
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+models:
+  tenant_alert:
+    +materialized: view
+    bronze:
+      +schema: bronze
+    silver:
+      +schema: silver
+    gold:
+      +schema: gold
+    ml:
+      +schema: ml
