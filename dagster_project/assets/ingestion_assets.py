@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import datetime as dt
-from pathlib import Path
 
 from dagster import AssetExecutionContext, DailyPartitionsDefinition, Output, asset
 
-from ingestion.nyc311.jobs import fetch_incremental_partition
+from ingestion.nyc311.jobs import run_311_partition_etl
+from tenant_alert.config import settings
 
 
 nyc311_partitions = DailyPartitionsDefinition(start_date="2024-01-01")
@@ -15,9 +15,20 @@ nyc311_partitions = DailyPartitionsDefinition(start_date="2024-01-01")
 
 @asset(partitions_def=nyc311_partitions, group_name="ingestion")
 def nyc311_raw_partition(context: AssetExecutionContext) -> Output[int]:
-    """Pull one day of 311 data and write local parquet artifact."""
+    """Pull one day of 311 data, land parquet, and optionally load bronze."""
     partition_date = dt.date.fromisoformat(context.partition_key)
-    next_date = partition_date + dt.timedelta(days=1)
-    output_file = Path("data/raw/nyc311") / f"created_date={partition_date.isoformat()}" / "data.parquet"
-    row_count = fetch_incremental_partition(partition_date, next_date, output_file)
-    return Output(row_count, metadata={"rows": row_count, "path": str(output_file)})
+    result = run_311_partition_etl(
+        partition_date,
+        app_token=settings.soda_app_token or None,
+        upload_to_gcs=settings.etl_upload_to_gcs,
+        load_to_bigquery=settings.etl_load_to_bigquery,
+    )
+    return Output(
+        result.row_count,
+        metadata={
+            "rows": result.row_count,
+            "local_path": str(result.local_path),
+            "gcs_uri": result.gcs_uri or "",
+            "bigquery_table": result.bigquery_table or "",
+        },
+    )

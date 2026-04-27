@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Iterator
 from typing import Any
 
 import httpx
@@ -54,11 +55,26 @@ class SocrataClient:
         page_size: int = 50_000,
     ) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
+        for page in self.iter_pages(dataset_id, where=where, order=order, page_size=page_size):
+            rows.extend(page)
+        return rows
+
+    def iter_pages(
+        self,
+        dataset_id: str,
+        *,
+        where: str | None = None,
+        order: str = "created_date asc",
+        page_size: int = 50_000,
+        max_pages: int | None = None,
+    ) -> Iterator[list[dict[str, Any]]]:
+        """Yield Socrata pages so large backfills do not accumulate in memory."""
         offset = 0
-        while True:
+        page_number = 0
+        while max_pages is None or page_number < max_pages:
             page = self.fetch_page(dataset_id, where=where, order=order, limit=page_size, offset=offset)
             if not page:
                 break
-            rows.extend(page)
+            yield page
             offset += page_size
-        return rows
+            page_number += 1

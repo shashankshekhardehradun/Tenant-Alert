@@ -14,6 +14,20 @@ class Settings(BaseSettings):
     bq_dataset_silver: str = "silver"
     bq_dataset_gold: str = "gold"
     bq_dataset_ml: str = "ml"
+    soda_app_token: str = ""
+    gcs_raw_bucket: str = ""
+    local_data_dir: str = "data"
+    etl_upload_to_gcs: bool = False
+    etl_load_to_bigquery: bool = False
+
+    @property
+    def raw_bucket_name(self) -> str:
+        """Return the configured raw-data bucket or the Terraform default name."""
+        if self.gcs_raw_bucket:
+            return self.gcs_raw_bucket
+        if not self.gcp_project_id:
+            return ""
+        return f"{self.gcp_project_id}-{self.environment}-raw"
 
     model_config = SettingsConfigDict(
         env_file=".env",

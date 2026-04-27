@@ -12,6 +12,19 @@ app.include_router(complaints.router, prefix="/complaints", tags=["complaints"])
 app.include_router(compare.router, prefix="/compare", tags=["compare"])
 
 
+@app.get("/")
+def root() -> dict[str, object]:
+    return {
+        "service": "Tenant Alert API",
+        "status": "ok",
+        "links": {
+            "health": "/healthz",
+            "docs": "/docs",
+            "openapi": "/openapi.json",
+        },
+    }
+
+
 @app.get("/healthz")
 def healthcheck() -> dict[str, str]:
     return {"status": "ok"}

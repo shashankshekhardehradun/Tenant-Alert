@@ -17,8 +17,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements/dev.txt
+          pip install -e .
+      - name: Secret scan
+        run: python scripts/check_secrets.py
       - name: Ruff
-        run: ruff check src tests ingestion api dagster_project
+        run: ruff check src tests ingestion api dagster_project scripts
       - name: Mypy
         run: mypy src
       - name: Pytest

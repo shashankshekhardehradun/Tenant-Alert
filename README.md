@@ -30,6 +30,7 @@ Tenant Alert is a data platform and web product for NYC renters. It ingests NYC 
 3. Install dependencies:
    - `python -m pip install --upgrade pip`
    - `pip install -r requirements/dev.txt`
+   - `pip install -e .`
 4. Copy environment template:
    - `copy .env.example .env`
 
@@ -42,3 +43,19 @@ Tenant Alert is a data platform and web product for NYC renters. It ingests NYC 
 ## Run local services
 
 - `docker compose up`
+
+## Run API locally
+
+- `uvicorn api.app.main:app --reload --port 8000`
+
+## Run one ETL partition locally
+
+This writes parquet under `data/raw/nyc311/...` and does not touch GCP:
+
+- `python -m ingestion.nyc311.cli --date 2024-01-01 --max-pages 1`
+
+After GCP resources exist and auth is configured, upload and load bronze:
+
+- `python -m ingestion.nyc311.cli --date 2024-01-01 --upload-to-gcs --load-to-bigquery`
+
+For Dagster, open the UI and materialize the `nyc311_raw_partition` asset. Local runs use `ETL_UPLOAD_TO_GCS=false` and `ETL_LOAD_TO_BIGQUERY=false` unless you opt into GCP in `.env`.
