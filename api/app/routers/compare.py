@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Query
 from google.cloud import bigquery
 
@@ -13,7 +15,10 @@ service = BigQueryService()
 
 
 @router.get("/boroughs")
-def compare_boroughs(left: str = Query(...), right: str = Query(...)) -> dict[str, object]:
+def compare_boroughs(
+    left: Annotated[str, Query(...)],
+    right: Annotated[str, Query(...)],
+) -> dict[str, object]:
     sql = f"""
         select borough, count(*) as complaints, avg(resolution_hours) as avg_resolution_hours
         from `{settings.gcp_project_id}.{settings.bq_dataset_gold}.gold_fct_complaints`

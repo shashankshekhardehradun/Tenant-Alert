@@ -89,6 +89,11 @@ logs/
 # Dagster local instance DB (if created locally)
 .dagster/
 
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
 # Misc secret-ish filenames people commonly drop into repos
 client_secret.json
 client_secret*.json

@@ -15,10 +15,13 @@ class Settings(BaseSettings):
     bq_dataset_gold: str = "gold"
     bq_dataset_ml: str = "ml"
     soda_app_token: str = ""
+    census_api_key: str = ""
     gcs_raw_bucket: str = ""
     local_data_dir: str = "data"
     etl_upload_to_gcs: bool = False
     etl_load_to_bigquery: bool = False
+    analytics_use_gold: bool = True
+    analytics_fallback_bronze: bool = True
 
     @property
     def raw_bucket_name(self) -> str:

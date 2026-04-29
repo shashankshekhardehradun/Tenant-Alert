@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Annotated
 
 from fastapi import APIRouter, Query
 from google.cloud import bigquery
@@ -16,9 +17,9 @@ service = BigQueryService()
 
 @router.get("/trend")
 def complaint_trend(
-    borough: str = Query(...),
-    start_date: date = Query(...),
-    end_date: date = Query(...),
+    borough: Annotated[str, Query(...)],
+    start_date: Annotated[date, Query(...)],
+    end_date: Annotated[date, Query(...)],
 ) -> dict[str, object]:
     sql = f"""
         select complaint_created_date, complaint_type, count(*) as complaint_count

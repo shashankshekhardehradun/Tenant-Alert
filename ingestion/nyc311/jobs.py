@@ -7,9 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import polars as pl
+from google.api_core import exceptions as gcp_exceptions
 from google.cloud import bigquery
 
-from ingestion.common.bigquery import load_parquet_to_table
+from ingestion.common.bigquery import delete_rows_for_partition_date, load_parquet_to_table
 from ingestion.common.socrata import SocrataClient, SocrataConfig
 from ingestion.common.storage import upload_file_to_gcs
 from tenant_alert.config import settings
@@ -109,7 +110,7 @@ def fetch_incremental_partition(
     rows = client.fetch_all(NYC311_DATASET_ID, where=where)
     if not rows:
         return 0
-    frame = pl.DataFrame(rows)
+    frame = pl.DataFrame(rows, strict=False)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(output_path)
     return frame.height
@@ -146,7 +147,7 @@ def run_311_partition_etl(
         page_size=page_size,
         max_pages=max_pages,
     ):
-        frames.append(pl.DataFrame(page))
+        frames.append(pl.DataFrame(page, strict=False))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if not frames:
@@ -169,15 +170,26 @@ def run_311_partition_etl(
             raise ValueError("load_to_bigquery=True requires GCP_PROJECT_ID")
         if not gcs_uri:
             raise ValueError("load_to_bigquery=True requires upload_to_gcs=True")
-        bigquery_table = load_parquet_to_table(
-            gcs_uri,
-            project_id=settings.gcp_project_id,
-            dataset_id=settings.bq_dataset_bronze,
-            table_id=RAW_311_TABLE,
-            schema=NYC311_BRONZE_SCHEMA,
-            partition_field="created_date",
-            clustering_fields=["borough", "complaint_type"],
-        )
+        try:
+            delete_rows_for_partition_date(
+                project_id=settings.gcp_project_id,
+                dataset_id=settings.bq_dataset_bronze,
+                table_id=RAW_311_TABLE,
+                partition_date=partition_date,
+                partition_field="created_date",
+            )
+        except gcp_exceptions.NotFound:
+            pass
+        if frame.height > 0:
+            bigquery_table = load_parquet_to_table(
+                gcs_uri,
+                project_id=settings.gcp_project_id,
+                dataset_id=settings.bq_dataset_bronze,
+                table_id=RAW_311_TABLE,
+                schema=NYC311_BRONZE_SCHEMA,
+                partition_field="created_date",
+                clustering_fields=["borough", "complaint_type"],
+            )
 
     return ExtractLoadResult(
         row_count=frame.height,

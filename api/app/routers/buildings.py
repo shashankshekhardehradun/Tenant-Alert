@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Query
 from google.cloud import bigquery
 
@@ -13,7 +15,7 @@ service = BigQueryService()
 
 
 @router.get("/lookup")
-def building_lookup(address: str = Query(..., min_length=3)) -> dict[str, object]:
+def building_lookup(address: Annotated[str, Query(..., min_length=3)]) -> dict[str, object]:
     sql = f"""
         select incident_address, borough, complaint_type, count(*) as complaint_count
         from `{settings.gcp_project_id}.{settings.bq_dataset_gold}.gold_fct_complaints`
@@ -27,9 +29,12 @@ def building_lookup(address: str = Query(..., min_length=3)) -> dict[str, object
 
 
 @router.get("/predictions")
-def building_predictions(address: str = Query(..., min_length=3)) -> dict[str, object]:
+def building_predictions(address: Annotated[str, Query(..., min_length=3)]) -> dict[str, object]:
     sql = f"""
-        select borough, complaint_type, avg(predicted_resolution_hours) as predicted_resolution_hours
+        select
+          borough,
+          complaint_type,
+          avg(predicted_resolution_hours) as predicted_resolution_hours
         from `{settings.gcp_project_id}.{settings.bq_dataset_ml}.predictions_resolution_time`
         where lower(unique_key) is not null
         group by borough, complaint_type

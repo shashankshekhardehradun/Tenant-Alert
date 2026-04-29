@@ -2,9 +2,33 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from collections.abc import Sequence
 
 from google.cloud import bigquery
+
+
+def delete_rows_for_partition_date(
+    *,
+    project_id: str,
+    dataset_id: str,
+    table_id: str,
+    partition_date: dt.date,
+    partition_field: str = "created_date",
+) -> None:
+    """Delete all rows whose calendar day matches partition_date (UTC date() of TIMESTAMP)."""
+    client = bigquery.Client(project=project_id)
+    table = f"`{project_id}.{dataset_id}.{table_id}`"
+    sql = f"""
+        delete from {table}
+        where date({partition_field}) = @partition_date
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("partition_date", "DATE", partition_date.isoformat()),
+        ]
+    )
+    client.query(sql, job_config=job_config).result()
 
 
 def load_parquet_to_table(

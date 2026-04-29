@@ -8,6 +8,8 @@ select
   agency,
   complaint_type,
   borough,
+  bbl,
+  bin,
   latitude,
   longitude,
   incident_zip,
