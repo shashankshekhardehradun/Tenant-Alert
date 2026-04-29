@@ -1,5 +1,5 @@
-import { DashboardCharts } from "../components/DashboardCharts";
-import type { OverviewPayload } from "../components/DashboardCharts";
+import { CrimeDashboard } from "../components/CrimeDashboard";
+import type { CrimeOverviewPayload } from "../components/CrimeDashboard";
 
 function utcIsoDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -37,16 +37,16 @@ function clampLast90DaysUtc(minDay: string, maxDay: string): { start: string; en
   return { start: utcIsoDate(start), end: utcIsoDate(end) };
 }
 
-async function getAnalyticsOverview(
+async function getCrimeOverview(
   apiUrl: string,
-): Promise<{ overview: OverviewPayload | null; error?: string; note?: string }> {
+): Promise<{ overview: CrimeOverviewPayload | null; error?: string; note?: string }> {
   const end = new Date();
   const start = new Date(end);
   start.setUTCDate(end.getUTCDate() - 89);
   const preferred = { start: utcIsoDate(start), end: utcIsoDate(end) };
 
   const overviewUrl = (range: { start: string; end: string }) => {
-    const url = new URL(`${apiUrl}/analytics/overview`);
+    const url = new URL(`${apiUrl}/crime/overview`);
     url.searchParams.set("start_date", range.start);
     url.searchParams.set("end_date", range.end);
     url.searchParams.set("top_n", "10");
@@ -54,7 +54,7 @@ async function getAnalyticsOverview(
   };
 
   try {
-    const first = await fetchJson<OverviewPayload>(overviewUrl(preferred));
+    const first = await fetchJson<CrimeOverviewPayload>(overviewUrl(preferred));
     if (!first.ok) {
       return { overview: null, error: `API error (${first.status}): ${first.text}` };
     }
@@ -62,26 +62,27 @@ async function getAnalyticsOverview(
       return { overview: first.data };
     }
 
-    const range = await fetchJson<DataRangePayload>(`${apiUrl}/analytics/data-range`);
+    const range = await fetchJson<DataRangePayload>(`${apiUrl}/crime/data-range`);
     if (!range.ok) {
       return { overview: first.data, error: `API error (${range.status}): ${range.text}` };
     }
     if (!range.data.min_day || !range.data.max_day || range.data.row_count === 0) {
       return {
         overview: first.data,
-        error: "BigQuery bronze table looks empty. Run a larger 311 backfill/load before charting.",
+        error:
+          "BigQuery crime marts look empty. Ingest NYPD complaints and run dbt before charting.",
       };
     }
 
     const clamped = clampLast90DaysUtc(range.data.min_day, range.data.max_day);
-    const second = await fetchJson<OverviewPayload>(overviewUrl(clamped));
+    const second = await fetchJson<CrimeOverviewPayload>(overviewUrl(clamped));
     if (!second.ok) {
       return { overview: first.data, error: `API error (${second.status}): ${second.text}` };
     }
 
     return {
       overview: second.data,
-      note: `No data in the last 90 UTC days. Showing the latest available 90-day window from bronze: ${clamped.start} → ${clamped.end}.`,
+      note: `No crime data in the last 90 UTC days. Showing the latest available window: ${clamped.start} → ${clamped.end}.`,
     };
   } catch (cause: unknown) {
     const message = cause instanceof Error ? cause.message : String(cause);
@@ -96,18 +97,19 @@ async function getAnalyticsOverview(
 
 export default async function HomePage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-  const { overview, error, note } = await getAnalyticsOverview(apiUrl);
+  const { overview, error, note } = await getCrimeOverview(apiUrl);
   return (
     <main style={{ margin: "2rem auto", maxWidth: 1100, fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ margin: "0 0 0.5rem" }}>Tenant Alert</h1>
+      <h1 style={{ margin: "0 0 0.5rem" }}>NYC Roulette</h1>
       <p style={{ margin: "0 0 1.5rem", color: "#475467", maxWidth: "80ch" }}>
-        NYC tenant analytics from 311 complaints. This dashboard reads aggregate metrics from the API backed by BigQuery.
+        Crime intelligence across NYC neighborhoods, time windows, and demographic context.
+        This first dashboard reads NYPD complaint marts from BigQuery.
       </p>
       {note ? (
         <p style={{ margin: "0 0 1rem", color: "#175cd3", maxWidth: "80ch" }}>{note}</p>
       ) : null}
 
-      <DashboardCharts overview={overview} error={error} />
+      <CrimeDashboard overview={overview} error={error} />
     </main>
   );
 }

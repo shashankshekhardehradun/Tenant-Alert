@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -22,7 +22,11 @@ class SocrataClient:
     def __init__(self, config: SocrataConfig) -> None:
         self._config = config
         headers = {"X-App-Token": config.app_token} if config.app_token else None
-        self._client = httpx.Client(base_url=config.base_url, headers=headers, timeout=config.timeout_seconds)
+        self._client = httpx.Client(
+            base_url=config.base_url,
+            headers=headers,
+            timeout=config.timeout_seconds,
+        )
 
     def fetch_page(
         self,
@@ -72,7 +76,13 @@ class SocrataClient:
         offset = 0
         page_number = 0
         while max_pages is None or page_number < max_pages:
-            page = self.fetch_page(dataset_id, where=where, order=order, limit=page_size, offset=offset)
+            page = self.fetch_page(
+                dataset_id,
+                where=where,
+                order=order,
+                limit=page_size,
+                offset=offset,
+            )
             if not page:
                 break
             yield page

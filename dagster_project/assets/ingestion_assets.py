@@ -5,10 +5,9 @@ from __future__ import annotations
 import datetime as dt
 
 from dagster import AssetExecutionContext, DailyPartitionsDefinition, Output, asset
-
 from ingestion.nyc311.jobs import run_311_partition_etl
-from tenant_alert.config import settings
 
+from tenant_alert.config import settings
 
 nyc311_partitions = DailyPartitionsDefinition(start_date="2024-01-01")
 

@@ -31,6 +31,32 @@ def delete_rows_for_partition_date(
     client.query(sql, job_config=job_config).result()
 
 
+def delete_rows_for_date_range(
+    *,
+    project_id: str,
+    dataset_id: str,
+    table_id: str,
+    start_date: dt.date,
+    end_date: dt.date,
+    date_field: str,
+) -> None:
+    """Delete rows whose date_field calendar day falls within [start_date, end_date)."""
+    client = bigquery.Client(project=project_id)
+    table = f"`{project_id}.{dataset_id}.{table_id}`"
+    sql = f"""
+        delete from {table}
+        where date({date_field}) >= @start_date
+          and date({date_field}) < @end_date
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("start_date", "DATE", start_date.isoformat()),
+            bigquery.ScalarQueryParameter("end_date", "DATE", end_date.isoformat()),
+        ]
+    )
+    client.query(sql, job_config=job_config).result()
+
+
 def load_parquet_to_table(
     source_uri: str,
     *,

@@ -16,6 +16,16 @@ import {
 type BoroughRow = { borough: string; complaint_count: number };
 type TrendRow = { day: string; complaint_count: number };
 type TopTypeRow = { complaint_type: string; complaint_count: number };
+export type NtaDemographicRow = {
+  nta_code: string;
+  nta_name: string;
+  borough: string;
+  total_population: number | null;
+  approx_median_household_income: number | null;
+  approx_median_gross_rent: number | null;
+  poverty_rate: number | null;
+  renter_share: number | null;
+};
 
 export type OverviewPayload = {
   start_date: string;
@@ -27,7 +37,11 @@ export type OverviewPayload = {
   top_complaint_types: TopTypeRow[];
 };
 
-export function DashboardCharts(props: { overview: OverviewPayload | null; error?: string }) {
+export function DashboardCharts(props: {
+  overview: OverviewPayload | null;
+  demographics?: NtaDemographicRow[];
+  error?: string;
+}) {
   if (props.error) {
     return <p style={{ color: "#b42318" }}>{props.error}</p>;
   }
@@ -61,6 +75,28 @@ export function DashboardCharts(props: { overview: OverviewPayload | null; error
   const topTypes = props.overview.top_complaint_types.map((row) => ({
     type: row.complaint_type.length > 42 ? `${row.complaint_type.slice(0, 42)}…` : row.complaint_type,
     complaints: row.complaint_count,
+  }));
+
+  const demographicByBorough = Object.values(
+    (props.demographics ?? []).reduce<
+      Record<string, { borough: string; population: number; incomeTotal: number; rentTotal: number }>
+    >((acc, row) => {
+      const population = Number(row.total_population ?? 0);
+      const income = Number(row.approx_median_household_income ?? 0);
+      const rent = Number(row.approx_median_gross_rent ?? 0);
+      if (!row.borough || population <= 0) {
+        return acc;
+      }
+      acc[row.borough] ??= { borough: row.borough, population: 0, incomeTotal: 0, rentTotal: 0 };
+      acc[row.borough].population += population;
+      acc[row.borough].incomeTotal += income * population;
+      acc[row.borough].rentTotal += rent * population;
+      return acc;
+    }, {}),
+  ).map((row) => ({
+    borough: row.borough,
+    medianIncome: Math.round(row.incomeTotal / row.population),
+    medianRent: Math.round(row.rentTotal / row.population),
   }));
 
   return (
@@ -135,6 +171,32 @@ export function DashboardCharts(props: { overview: OverviewPayload | null; error
           </ResponsiveContainer>
         </div>
       </section>
+
+      {demographicByBorough.length > 0 ? (
+        <section>
+          <h3 style={{ margin: "0 0 0.75rem" }}>ACS demographics preview by borough</h3>
+          <p style={{ margin: "0 0 0.75rem", color: "#475467" }}>
+            Population-weighted NTA estimates. Median-style fields are approximate until we add
+            distribution-based interpolation.
+          </p>
+          <div style={{ width: "100%", height: 320 }}>
+            <ResponsiveContainer>
+              <BarChart
+                data={demographicByBorough}
+                margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="borough" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="medianIncome" name="Approx. median household income" fill="#0e9384" />
+                <Bar dataKey="medianRent" name="Approx. median gross rent" fill="#f79009" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

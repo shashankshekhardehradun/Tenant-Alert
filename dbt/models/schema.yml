@@ -9,3 +9,29 @@ models:
     columns:
       - name: complaint_created_date
         tests: [not_null]
+  - name: silver_crime_events
+    columns:
+      - name: complaint_id
+        tests: [not_null, unique]
+      - name: complaint_date
+        tests: [not_null]
+  - name: gold_fct_crime_events
+    columns:
+      - name: complaint_id
+        tests: [not_null, unique]
+      - name: complaint_date
+        tests: [not_null]
+  - name: silver_census_acs_tract
+    columns:
+      - name: tract_geoid
+        tests: [not_null, unique]
+  - name: silver_tract_nta_equivalency
+    columns:
+      - name: tract_geoid
+        tests: [not_null, unique]
+      - name: nta_code
+        tests: [not_null]
+  - name: gold_agg_demographics_by_nta
+    columns:
+      - name: nta_code
+        tests: [not_null, unique]

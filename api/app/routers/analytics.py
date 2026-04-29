@@ -172,3 +172,39 @@ def analytics_overview(
         status_code=503,
         detail=f"Could not read analytics from BigQuery. Last error: {last_error}",
     )
+
+
+@router.get("/demographics/nta")
+def nta_demographics(
+    limit: Annotated[int, Query(ge=1, le=500)] = 500,
+) -> dict[str, object]:
+    """Return NTA-level demographic feature rows for charts and future map layers."""
+    project = _require_project()
+    table = f"`{project}.{settings.bq_dataset_gold}.gold_agg_demographics_by_nta`"
+    sql = f"""
+        select
+          nta_code,
+          nta_name,
+          borough,
+          acs_year,
+          tract_count,
+          total_population,
+          approx_median_household_income,
+          approx_per_capita_income,
+          approx_median_gross_rent,
+          poverty_rate,
+          renter_share,
+          bachelors_or_higher_share,
+          white_alone_share,
+          black_alone_share,
+          asian_alone_share,
+          hispanic_or_latino_share
+        from {table}
+        order by borough, nta_name
+        limit @limit
+    """
+    rows = service.query(
+        sql,
+        params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
+    )
+    return {"source": "gold_agg_demographics_by_nta", "items": rows}

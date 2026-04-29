@@ -87,4 +87,58 @@ dbt build
 
 See `dbt/README.md` for details. The FastAPI analytics endpoints prefer `gold_fct_complaints` when available (`ANALYTICS_USE_GOLD=true`).
 
+## Ingest demographics and geography features
+
+Add your Census API key to `.env`:
+
+```env
+CENSUS_API_KEY=your-census-api-key
+```
+
+Ingest ACS tract demographics for an ACS 5-year vintage:
+
+```powershell
+python -m ingestion.census.cli --year 2023 --upload-to-gcs --load-to-bigquery
+```
+
+Ingest NYC tract-to-NTA equivalency:
+
+```powershell
+python -m ingestion.geography.cli --dataset tract-nta --upload-to-gcs --load-to-bigquery
+```
+
+Then rebuild dbt:
+
+```powershell
+$env:GCP_PROJECT_ID='tenant-alert-494522'
+dbt build --project-dir D:\Tenant-Alert\dbt --profiles-dir D:\Tenant-Alert\dbt
+```
+
+The dashboard/API can then read `gold.gold_agg_demographics_by_nta` for map-ready NTA demographic features.
+
+## Ingest NYPD crime data
+
+Historic NYPD complaints use NYC Open Data dataset `qgea-i56i`; current YTD uses `5uac-w243`.
+
+Small smoke test without touching GCP:
+
+```powershell
+python -m ingestion.crime.cli --source historic --start-date 2024-01-01 --end-date 2024-01-02 --max-pages 1
+```
+
+Load a date window to GCS and BigQuery:
+
+```powershell
+python -m ingestion.crime.cli --source historic --start-date 2024-01-01 --end-date 2024-02-01 --upload-to-gcs --load-to-bigquery
+```
+
+Then rebuild dbt:
+
+```powershell
+$env:GCP_PROJECT_ID='tenant-alert-494522'
+dbt build --project-dir D:\Tenant-Alert\dbt --profiles-dir D:\Tenant-Alert\dbt
+```
+
+See `docs/bigquery_tables.md` for the BigQuery table inventory and starter EDA queries.
+
 For Dagster, open the UI and materialize the `nyc311_raw_partition` asset. Local runs use `ETL_UPLOAD_TO_GCS=false` and `ETL_LOAD_TO_BIGQUERY=false` unless you opt into GCP in `.env`.
