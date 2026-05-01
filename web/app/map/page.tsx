@@ -6,20 +6,39 @@ import { CrimeDashboard } from "../../components/CrimeDashboard";
 export default async function MapPage() {
   const { overview, error, note } = await getCrimeOverview();
   return (
-    <main style={{ margin: "2rem auto", maxWidth: 1200, fontFamily: "system-ui, sans-serif" }}>
-      <nav style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem" }}>
-        <Link href="/graphs">Graphs</Link>
-        <Link href="/map">Map</Link>
+    <main className="bulletin-shell">
+      <div className="bulletin-topline">
+        <span>Map Room</span>
+        <span>Field notes from the five boroughs</span>
+        <span>Street Ledger</span>
+      </div>
+      <header className="masthead">
+        <div>
+          <p className="kicker">The Street Ledger</p>
+          <h1 className="masthead-title">NYC Hot Spots</h1>
+          <p className="masthead-deck">
+            A crime-desk map with Google tilt, deck.gl density columns, severity filters,
+            Street View jump-outs, and enough red ink to make the night shift nervous.
+          </p>
+        </div>
+        <aside className="price-box" aria-label="Map room status">
+          <span>Layer</span>
+          <strong>3D</strong>
+          <span>density mode</span>
+        </aside>
+      </header>
+      <nav className="bulletin-nav">
+        <Link className="nav-link" href="/graphs">Front Page</Link>
+        <Link className="nav-link" href="/map">The Map Room</Link>
       </nav>
-      <h1 style={{ margin: "0 0 0.5rem" }}>NYC Roulette map</h1>
-      <p style={{ margin: "0 0 1.5rem", color: "#475467", maxWidth: "80ch" }}>
-        Interactive geospatial view of sampled NYPD complaint events with density and event details.
-      </p>
+      <div className="ticker">Drag, tilt, filter, investigate. Every marker links back to source data.</div>
       {note ? (
-        <p style={{ margin: "0 0 1rem", color: "#175cd3", maxWidth: "80ch" }}>{note}</p>
+        <p className="paper-card blotter-note" style={{ margin: "1rem 0 0", padding: "0.75rem" }}>{note}</p>
       ) : null}
 
-      <CrimeDashboard overview={overview} error={error} view="map" />
+      <div className="content-stack">
+        <CrimeDashboard overview={overview} error={error} view="map" />
+      </div>
     </main>
   );
 }

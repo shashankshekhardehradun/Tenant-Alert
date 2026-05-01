@@ -70,11 +70,11 @@ export type CrimeOverviewPayload = {
 };
 
 const BOROUGH_COLORS: Record<string, string> = {
-  BRONX: "#c4320a",
-  BROOKLYN: "#175cd3",
-  MANHATTAN: "#7c3aed",
-  QUEENS: "#067647",
-  "STATEN ISLAND": "#b54708",
+  BRONX: "#b33124",
+  BROOKLYN: "#1f5f8b",
+  MANHATTAN: "#6f3f1d",
+  QUEENS: "#2f6d4f",
+  "STATEN ISLAND": "#d89222",
 };
 
 const VALID_BOROUGHS = new Set(Object.keys(BOROUGH_COLORS));
@@ -86,9 +86,9 @@ const LAW_CATEGORY_DESCRIPTIONS: Record<string, string> = {
 };
 
 const LAW_CATEGORY_COLORS: Record<string, string> = {
-  FELONY: "#b42318",
-  MISDEMEANOR: "#f79009",
-  VIOLATION: "#1570ef",
+  FELONY: "#b33124",
+  MISDEMEANOR: "#d89222",
+  VIOLATION: "#1f5f8b",
 };
 
 const DAY_LABELS: Record<number, string> = {
@@ -102,11 +102,12 @@ const DAY_LABELS: Record<number, string> = {
 };
 
 const CARD_STYLE = {
-  border: "1px solid #eaecf0",
-  borderRadius: 18,
+  border: "3px solid #17110d",
+  borderRadius: 0,
   padding: "1.1rem",
-  background: "linear-gradient(180deg, #ffffff 0%, #fcfcfd 100%)",
-  boxShadow: "0 12px 32px rgba(16, 24, 40, 0.07)",
+  background:
+    "linear-gradient(135deg, rgba(255,255,255,0.28), transparent 45%), #f8edcf",
+  boxShadow: "8px 8px 0 rgba(23, 17, 13, 0.22)",
 } as const;
 
 function isValidBorough(value: string | null | undefined) {
@@ -146,15 +147,16 @@ function DailyCrimeTooltip({ active, payload, label }: TooltipProps<number, stri
   return (
     <div
       style={{
-        background: "white",
-        border: "1px solid #d0d5dd",
-        borderRadius: 8,
-        boxShadow: "0 8px 24px rgba(16, 24, 40, 0.12)",
+        background: "#f8edcf",
+        border: "3px solid #17110d",
+        borderRadius: 0,
+        boxShadow: "6px 6px 0 rgba(23, 17, 13, 0.24)",
+        color: "#17110d",
         padding: "0.75rem",
         maxWidth: 320,
       }}
     >
-      <strong>{label}</strong>
+      <strong style={{ fontFamily: "Impact, Arial Narrow, sans-serif", textTransform: "uppercase" }}>{label}</strong>
       <p style={{ margin: "0.35rem 0" }}>{Number(row.crimes ?? 0).toLocaleString()} events</p>
       {row.topOffenses?.length ? (
         <>
@@ -190,7 +192,8 @@ function EventLegend({
         ...CARD_STYLE,
       }}
     >
-      <h3 style={{ margin: "0 0 0.75rem" }}>Event legend</h3>
+      <span className="section-label">Legend Desk</span>
+      <h3 style={{ margin: "0.55rem 0 0.75rem" }}>How to read the chaos</h3>
       <div style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <div>
           <h4 style={{ margin: "0 0 0.5rem" }}>Borough colors</h4>
@@ -261,11 +264,11 @@ function MetricCards({
   );
   const topBorough = boroughs[0];
   const metrics = [
-    { label: "Events in window", value: rowCount.toLocaleString(), detail: "Filtered to geocoded NYC records" },
-    { label: "Highest borough", value: topBorough?.borough ?? "n/a", detail: `${formatCompact(topBorough?.crime_count)} events` },
-    { label: "Top offense", value: topOffense?.offense_description ?? "n/a", detail: `${formatCompact(topOffense?.crime_count)} events` },
+    { label: "Today's Trouble Index", value: rowCount.toLocaleString(), detail: "Geocoded NYPD reports in this issue" },
+    { label: "Borough on blast", value: topBorough?.borough ?? "n/a", detail: `${formatCompact(topBorough?.crime_count)} reports filed` },
+    { label: "Front-page offense", value: topOffense?.offense_description ?? "n/a", detail: `${formatCompact(topOffense?.crime_count)} mentions` },
     {
-      label: "Peak time cell",
+      label: "Most chaotic hour",
       value: peakCell ? `${DAY_LABELS[peakCell.day_of_week]} ${peakCell.hour}:00` : "n/a",
       detail: `${formatCompact(peakCell?.crime_count)} events`,
     },
@@ -274,9 +277,9 @@ function MetricCards({
   return (
     <section style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
       {metrics.map((metric) => (
-        <div key={metric.label} style={{ ...CARD_STYLE, background: "linear-gradient(135deg, #111827 0%, #7a271a 100%)", color: "white" }}>
+        <div key={metric.label} className="paper-card" style={{ ...CARD_STYLE, background: "#17110d", color: "#f8edcf" }}>
           <p style={{ margin: "0 0 0.35rem", opacity: 0.75 }}>{metric.label}</p>
-          <strong style={{ display: "block", fontSize: "1.45rem", lineHeight: 1.1 }}>{metric.value}</strong>
+          <strong style={{ display: "block", fontFamily: "Impact, Arial Narrow, sans-serif", fontSize: "1.75rem", lineHeight: 1, textTransform: "uppercase" }}>{metric.value}</strong>
           <p style={{ margin: "0.45rem 0 0", opacity: 0.75 }}>{metric.detail}</p>
         </div>
       ))}
@@ -290,7 +293,8 @@ function HourlyDensityPlot({ rows }: { rows: HourlyDensityRow[] }) {
 
   return (
     <section style={CARD_STYLE}>
-      <h3 style={{ margin: "0 0 0.4rem" }}>Crime density by hour and weekday</h3>
+      <span className="section-label">Night Watch</span>
+      <h3 style={{ margin: "0.55rem 0 0.4rem" }}>Crime density by hour and weekday</h3>
       <p style={{ margin: "0 0 1rem", color: "#475467" }}>
         Darker cells show the time blocks where reported events concentrate.
       </p>
@@ -317,7 +321,8 @@ function HourlyDensityPlot({ rows }: { rows: HourlyDensityRow[] }) {
                     style={{
                       height: 22,
                       borderRadius: 5,
-                      background: `rgba(196, 50, 10, ${0.08 + intensity * 0.92})`,
+                      background: `rgba(179, 49, 36, ${0.1 + intensity * 0.9})`,
+                      border: "1px solid rgba(23,17,13,0.25)",
                     }}
                   />
                 );
@@ -343,7 +348,8 @@ function SocioeconomicScatter({ rows }: { rows: DemographicBoroughRow[] }) {
 
   return (
     <section style={CARD_STYLE}>
-      <h3 style={{ margin: "0 0 0.4rem" }}>Crime rate vs economic context</h3>
+      <span className="section-label">Social & Economic Lens</span>
+      <h3 style={{ margin: "0.55rem 0 0.4rem" }}>Crime rate vs economic context</h3>
       <p style={{ margin: "0 0 1rem", color: "#475467" }}>
         Poverty rate is the share of borough residents whose household income falls below the Census
         poverty threshold. A borough can have a high median income and still have a meaningful poverty
@@ -486,7 +492,8 @@ function RotatableRiskSpace({ rows }: { rows: DemographicBoroughRow[] }) {
 
   return (
     <section style={CARD_STYLE}>
-      <h3 style={{ margin: "0 0 0.4rem" }}>Rotatable socioeconomic crime space</h3>
+      <span className="section-label">Case Board</span>
+      <h3 style={{ margin: "0.55rem 0 0.4rem" }}>Rotatable socioeconomic crime space</h3>
       <p style={{ margin: "0 0 1rem", color: "#475467" }}>
         Drag to rotate 360 degrees. Each point is a borough: x = poverty rate, y = renter share,
         z = median household income, and color/size = observed crime rate per 100k residents.
@@ -550,9 +557,10 @@ export function CrimeDashboard(props: {
 
   return (
     <div style={{ display: "grid", gap: "1.5rem" }}>
-      <section>
-        <h2 style={{ margin: "0 0 0.75rem" }}>NYC Roulette crime window</h2>
-        <p style={{ margin: 0, color: "#475467" }}>
+      <section className="paper-card" style={{ padding: "1rem" }}>
+        <span className="section-label">Filed Window</span>
+        <h2 style={{ margin: "0.55rem 0 0.75rem" }}>What the blotter is counting</h2>
+        <p style={{ margin: 0, color: "#6a5947" }}>
           {props.overview.start_date} → {props.overview.end_date} ·{" "}
           <strong>{props.overview.row_count.toLocaleString()}</strong> reported events · source:{" "}
           <strong>{props.overview.source}</strong>
@@ -563,8 +571,9 @@ export function CrimeDashboard(props: {
 
       {showMap ? (
       <section>
-        <h3 style={{ margin: "0 0 0.5rem" }}>Crime location sample</h3>
-        <p style={{ margin: "0 0 0.75rem", color: "#475467" }}>
+        <span className="section-label">The Map Room</span>
+        <h3 style={{ margin: "0.55rem 0 0.5rem" }}>Crime location sample</h3>
+        <p style={{ margin: "0 0 0.75rem", color: "#6a5947" }}>
           Showing up to {mapPoints.length.toLocaleString()} geocoded events sampled from the selected
           window. Hover a dot for event context.
         </p>
@@ -582,11 +591,12 @@ export function CrimeDashboard(props: {
       />
 
       <section style={CARD_STYLE}>
-        <h3 style={{ margin: "0 0 0.75rem" }}>Reported crime by borough</h3>
+        <span className="section-label">Borough Risk Ranking</span>
+        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Reported crime by borough</h3>
         <div style={{ width: "100%", height: 320 }}>
           <ResponsiveContainer>
             <BarChart data={boroughData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eaecf0" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#cdb98b" />
               <XAxis dataKey="borough" />
               <YAxis />
               <Tooltip />
@@ -602,17 +612,18 @@ export function CrimeDashboard(props: {
       </section>
 
       <section style={CARD_STYLE}>
-        <h3 style={{ margin: "0 0 0.75rem" }}>Daily reported crime trend</h3>
+        <span className="section-label">Biggest Spike Watch</span>
+        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Daily reported crime trend</h3>
         <div style={{ width: "100%", height: 320 }}>
           <ResponsiveContainer>
             <AreaChart data={trendData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="crimeTrend" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="5%" stopColor="#c4320a" stopOpacity={0.55} />
-                  <stop offset="95%" stopColor="#c4320a" stopOpacity={0.04} />
+                  <stop offset="5%" stopColor="#b33124" stopOpacity={0.65} />
+                  <stop offset="95%" stopColor="#b33124" stopOpacity={0.06} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eaecf0" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#cdb98b" />
               <XAxis dataKey="day" tick={{ fontSize: 12 }} />
               <YAxis />
               <Tooltip content={<DailyCrimeTooltip />} />
@@ -621,7 +632,7 @@ export function CrimeDashboard(props: {
                 type="monotone"
                 dataKey="crimes"
                 name="Reported events"
-                stroke="#7a271a"
+                stroke="#17110d"
                 strokeWidth={2}
                 fill="url(#crimeTrend)"
               />
@@ -631,11 +642,12 @@ export function CrimeDashboard(props: {
       </section>
 
       <section style={CARD_STYLE}>
-        <h3 style={{ margin: "0 0 0.75rem" }}>Severity mix</h3>
+        <span className="section-label">Trouble Type</span>
+        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Severity mix</h3>
         <div style={{ width: "100%", height: 280 }}>
           <ResponsiveContainer>
             <BarChart data={lawData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eaecf0" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#cdb98b" />
               <XAxis dataKey="category" />
               <YAxis />
               <Tooltip />
@@ -660,7 +672,8 @@ export function CrimeDashboard(props: {
       <RotatableRiskSpace rows={demographics} />
 
       <section style={CARD_STYLE}>
-        <h3 style={{ margin: "0 0 0.75rem" }}>Top reported offenses</h3>
+        <span className="section-label">What's Hot</span>
+        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Top reported offenses</h3>
         <div style={{ width: "100%", height: 360 }}>
           <ResponsiveContainer>
             <BarChart
@@ -668,12 +681,12 @@ export function CrimeDashboard(props: {
               data={offenseData}
               margin={{ top: 10, right: 20, left: 10, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#eaecf0" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#cdb98b" />
               <XAxis type="number" />
               <YAxis type="category" dataKey="offense" width={220} tick={{ fontSize: 11 }} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="crimes" name="Reported events" fill="#175cd3" radius={[0, 6, 6, 0]} />
+              <Bar dataKey="crimes" name="Reported events" fill="#1f5f8b" radius={[0, 6, 6, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

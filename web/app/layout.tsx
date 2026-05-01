@@ -1,7 +1,9 @@
+import "./globals.css";
+
 export const metadata = {
-  title: "NYC Roulette",
-  description: "NYC crime analytics dashboard",
-}
+  title: "NYC Crime Pulse",
+  description: "A gritty NYC crime analytics bulletin",
+};
 
 export default function RootLayout({
   children,
@@ -12,5 +14,5 @@ export default function RootLayout({
     <html lang="en">
       <body>{children}</body>
     </html>
-  )
+  );
 }

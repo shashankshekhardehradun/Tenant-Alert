@@ -248,6 +248,7 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
       <div
+        className="control-strip"
         style={{
           display: "flex",
           flexWrap: "wrap",
@@ -258,16 +259,12 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
           {ALL_SEVERITIES.map((severity) => (
             <button
+              className="tabloid-button"
               key={severity}
               onClick={() => toggleSeverity(severity)}
               style={{
                 background: enabledSeverities.has(severity) ? `rgb(${colorForSeverity(severity).join(",")})` : "#f2f4f7",
-                border: "1px solid #d0d5dd",
-                borderRadius: 999,
-                color: enabledSeverities.has(severity) ? "white" : "#344054",
-                cursor: "pointer",
-                fontWeight: 700,
-                padding: "0.45rem 0.75rem",
+                color: enabledSeverities.has(severity) ? "#f8edcf" : "#17110d",
               }}
               type="button"
             >
@@ -278,32 +275,23 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
           {(["density", "incidents", "heat"] as const).map((mode) => (
             <button
+              className={viewMode === mode ? "tabloid-button active" : "tabloid-button"}
               key={mode}
               onClick={() => setViewMode(mode)}
-              style={{
-                background: viewMode === mode ? "#111827" : "white",
-                border: "1px solid #d0d5dd",
-                borderRadius: 8,
-                color: viewMode === mode ? "white" : "#344054",
-                cursor: "pointer",
-                padding: "0.45rem 0.7rem",
-              }}
               type="button"
             >
               {mode === "density" ? "3D Density" : mode === "incidents" ? "Incidents" : "Heat"}
             </button>
           ))}
-          <button onClick={resetCamera} type="button">Reset NYC</button>
-          <button onClick={tiltCamera} type="button">Tilt 3D</button>
-          <button onClick={tourBoroughs} type="button">Borough Tour</button>
+          <button className="tabloid-button" onClick={resetCamera} type="button">Reset NYC</button>
+          <button className="tabloid-button" onClick={tiltCamera} type="button">Tilt 3D</button>
+          <button className="tabloid-button" onClick={tourBoroughs} type="button">Borough Tour</button>
         </div>
       </div>
 
       <div
+        className="map-frame"
         style={{
-          border: "1px solid #d0d5dd",
-          borderRadius: 18,
-          boxShadow: "0 20px 60px rgba(16, 24, 40, 0.16)",
           height: 680,
           overflow: "hidden",
           position: "relative",
@@ -313,7 +301,7 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
         {status ? (
           <div
             style={{
-              background: "rgba(255, 255, 255, 0.92)",
+              background: "rgba(248, 237, 207, 0.94)",
               display: "grid",
               inset: 0,
               padding: "2rem",
@@ -324,18 +312,18 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
           >
             <div>
               <h3 style={{ margin: "0 0 0.5rem" }}>Google Maps setup needed</h3>
-              <p style={{ color: "#475467", margin: 0, maxWidth: 560 }}>{status}</p>
+              <p style={{ color: "#6a5947", margin: 0, maxWidth: 560 }}>{status}</p>
             </div>
           </div>
         ) : null}
         {hoverInfo ? (
           <div
             style={{
-              background: "rgba(17, 24, 39, 0.92)",
-              border: "1px solid rgba(255,255,255,0.16)",
-              borderRadius: 12,
-              boxShadow: "0 16px 48px rgba(0,0,0,0.28)",
-              color: "white",
+              background: "rgba(248, 237, 207, 0.95)",
+              border: "3px solid #17110d",
+              borderRadius: 0,
+              boxShadow: "6px 6px 0 rgba(179,49,36,0.28)",
+              color: "#17110d",
               left: hoverInfo.x + 16,
               maxWidth: 320,
               padding: "0.75rem",
@@ -345,7 +333,7 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
               zIndex: 2,
             }}
           >
-            <strong>{hoverInfo.point.offense_description}</strong>
+            <strong style={{ fontFamily: "Impact, Arial Narrow, sans-serif", textTransform: "uppercase" }}>{hoverInfo.point.offense_description}</strong>
             <p style={{ margin: "0.35rem 0 0" }}>
               {hoverInfo.point.complaint_date} · {hoverInfo.point.borough} · {hoverInfo.point.law_category}
             </p>
@@ -355,10 +343,10 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
         {selectedPoint ? (
           <aside
             style={{
-              background: "rgba(255,255,255,0.96)",
-              border: "1px solid #eaecf0",
-              borderRadius: 16,
-              boxShadow: "0 18px 56px rgba(16,24,40,0.22)",
+              background: "rgba(248,237,207,0.98)",
+              border: "4px solid #17110d",
+              borderRadius: 0,
+              boxShadow: "8px 8px 0 rgba(179,49,36,0.3)",
               maxWidth: 360,
               padding: "1rem",
               position: "absolute",
@@ -375,8 +363,9 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
             >
               x
             </button>
-            <h3 style={{ margin: "0 1.5rem 0.5rem 0" }}>{selectedPoint.offense_description}</h3>
-            <p style={{ color: "#475467", margin: "0 0 0.75rem" }}>
+            <span className="stamp">Filed Incident</span>
+            <h3 style={{ margin: "0.75rem 1.5rem 0.5rem 0" }}>{selectedPoint.offense_description}</h3>
+            <p style={{ color: "#6a5947", margin: "0 0 0.75rem" }}>
               {selectedPoint.complaint_date} · {selectedPoint.borough} · {selectedPoint.law_category}
             </p>
             {selectedPoint.premise_type ? <p><strong>Premise:</strong> {selectedPoint.premise_type}</p> : null}
