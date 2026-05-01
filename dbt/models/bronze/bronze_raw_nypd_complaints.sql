@@ -1,0 +1,32 @@
+{{ config(materialized='view') }}
+
+select
+  source_dataset,
+  cmplnt_num,
+  cmplnt_fr_dt,
+  cmplnt_fr_tm,
+  cmplnt_to_dt,
+  cmplnt_to_tm,
+  addr_pct_cd,
+  rpt_dt,
+  ky_cd,
+  ofns_desc,
+  pd_cd,
+  pd_desc,
+  crm_atpt_cptd_cd,
+  law_cat_cd,
+  boro_nm,
+  loc_of_occur_desc,
+  prem_typ_desc,
+  juris_desc,
+  parks_nm,
+  hadevelopt,
+  housing_psa,
+  x_coord_cd,
+  y_coord_cd,
+  latitude,
+  longitude,
+  patrol_boro,
+  station_name,
+  transit_district
+from {{ source('raw', 'raw_nypd_complaints') }}

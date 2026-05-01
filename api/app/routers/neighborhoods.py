@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Query
 from google.cloud import bigquery
 
@@ -13,7 +15,7 @@ service = BigQueryService()
 
 
 @router.get("/")
-def list_neighborhoods(limit: int = Query(default=20, ge=1, le=100)) -> dict[str, object]:
+def list_neighborhoods(limit: Annotated[int, Query(ge=1, le=100)] = 20) -> dict[str, object]:
     sql = f"""
         select borough, count(*) as complaints
         from `{settings.gcp_project_id}.{settings.bq_dataset_gold}.gold_fct_complaints`

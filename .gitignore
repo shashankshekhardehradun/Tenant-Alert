@@ -10,8 +10,91 @@ dist/
 build/
 *.egg-info/
 .DS_Store
-.env
-.env.*
 node_modules/
 .next/
 .turbo/
+
+# --- Secrets & credentials (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.pub
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+known_hosts
+.ssh/
+
+# Google Cloud / ADC
+application_default_credentials.json
+gcloud/
+**/application_default_credentials.json
+
+# Common service account / credential JSON naming patterns
+*-sa.json
+*-service-account*.json
+*service-account*.json
+*credentials*.json
+*.service-account.json
+
+# Terraform local state & providers (never commit)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Secret tfvars patterns (keep example tfvars committed if you add them later)
+*.auto.tfvars
+*.auto.tfvars.json
+secrets.tfvars
+secrets.*.tfvars
+*.tfvars
+!.terraform.tfvars.example
+!.tfvars.example
+
+# Local data / extracts / downloads
+data/
+downloads/
+tmp/
+temp/
+.cache/
+
+# OS / editor junk
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.swp
+*.swo
+
+# Logs that often accidentally contain tokens
+*.log
+logs/
+
+# Dagster local instance DB (if created locally)
+.dagster/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# Misc secret-ish filenames people commonly drop into repos
+client_secret.json
+client_secret*.json
+google_application_credentials.json

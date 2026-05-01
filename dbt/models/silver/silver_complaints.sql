@@ -11,7 +11,9 @@ with base as (
       cast(latitude as float64) as latitude,
       cast(longitude as float64) as longitude,
       incident_zip,
-      incident_address
+      incident_address,
+      cast(bbl as string) as bbl,
+      cast(bin as string) as bin
     from {{ ref('bronze_raw_311_complaints') }}
 )
 select
@@ -22,6 +24,8 @@ select
   agency,
   complaint_type,
   borough,
+  bbl,
+  bin,
   latitude,
   longitude,
   incident_zip,

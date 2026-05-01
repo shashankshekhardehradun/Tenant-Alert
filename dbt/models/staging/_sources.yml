@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: bronze
+    tables:
+      - name: raw_311_complaints
+      - name: raw_nypd_complaints
+      - name: raw_census_acs_tract
+      - name: raw_tract_nta_equivalency
