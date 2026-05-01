@@ -9,10 +9,22 @@ select
   cast(geoid as string) as tract_geoid,
   name,
   cast(total_population as float64) as total_population,
-  cast(median_household_income as float64) as median_household_income,
-  cast(median_household_income_moe as float64) as median_household_income_moe,
-  cast(per_capita_income as float64) as per_capita_income,
-  cast(median_gross_rent as float64) as median_gross_rent,
+  case
+    when cast(median_household_income as float64) < 0 then null
+    else cast(median_household_income as float64)
+  end as median_household_income,
+  case
+    when cast(median_household_income_moe as float64) < 0 then null
+    else cast(median_household_income_moe as float64)
+  end as median_household_income_moe,
+  case
+    when cast(per_capita_income as float64) < 0 then null
+    else cast(per_capita_income as float64)
+  end as per_capita_income,
+  case
+    when cast(median_gross_rent as float64) < 0 then null
+    else cast(median_gross_rent as float64)
+  end as median_gross_rent,
   cast(poverty_count as float64) as poverty_count,
   cast(white_alone as float64) as white_alone,
   cast(black_alone as float64) as black_alone,

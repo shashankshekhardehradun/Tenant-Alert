@@ -4,8 +4,18 @@ with typed as (
   select
     cast(cmplnt_num as string) as complaint_id,
     cast(source_dataset as string) as source_dataset,
-    cast(cmplnt_fr_dt as timestamp) as complaint_start_ts,
-    cast(cmplnt_to_dt as timestamp) as complaint_end_ts,
+    timestamp(
+      datetime(
+        date(cmplnt_fr_dt),
+        coalesce(safe.parse_time('%H:%M:%S', cmplnt_fr_tm), time '00:00:00')
+      )
+    ) as complaint_start_ts,
+    timestamp(
+      datetime(
+        date(cmplnt_to_dt),
+        coalesce(safe.parse_time('%H:%M:%S', cmplnt_to_tm), time '00:00:00')
+      )
+    ) as complaint_end_ts,
     cast(rpt_dt as timestamp) as reported_ts,
     safe_cast(addr_pct_cd as int64) as precinct,
     safe_cast(ky_cd as int64) as offense_code,
@@ -14,7 +24,10 @@ with typed as (
     nullif(upper(trim(pd_desc)), '') as internal_classification_description,
     nullif(upper(trim(crm_atpt_cptd_cd)), '') as attempt_completed,
     nullif(upper(trim(law_cat_cd)), '') as law_category,
-    nullif(upper(trim(boro_nm)), '') as borough,
+    case
+      when upper(trim(boro_nm)) in ('', '(NULL)', 'NULL', 'N/A', 'UNKNOWN') then null
+      else upper(trim(boro_nm))
+    end as borough,
     nullif(upper(trim(loc_of_occur_desc)), '') as occurrence_location,
     nullif(upper(trim(prem_typ_desc)), '') as premise_type,
     nullif(upper(trim(juris_desc)), '') as jurisdiction,

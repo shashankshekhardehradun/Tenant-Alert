@@ -60,6 +60,15 @@ npm run dev
 
 The home page calls `GET /analytics/overview` on the API (see `NEXT_PUBLIC_API_URL`). If you see connection errors, confirm the API is listening on the same host/port (default `http://localhost:8000`).
 
+For the immersive crime map, enable Google Maps Platform's Maps JavaScript API, create a browser-restricted API key, and add it to `.env`:
+
+```env
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-browser-restricted-google-maps-api-key
+NEXT_PUBLIC_GOOGLE_MAP_ID=your-optional-google-vector-map-id
+```
+
+Restrict the browser key to your local and deployed web origins. A Google Maps Map ID is optional, but recommended for a custom cinematic/vector map style with tilt and rotation.
+
 ## Run one ETL partition locally
 
 This writes parquet under `data/raw/nyc311/...` and does not touch GCP:

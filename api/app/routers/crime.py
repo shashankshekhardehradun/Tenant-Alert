@@ -21,6 +21,12 @@ def _crime_table() -> str:
     return f"`{settings.gcp_project_id}.{settings.bq_dataset_gold}.gold_fct_crime_events`"
 
 
+def _demographics_table() -> str:
+    if not settings.gcp_project_id:
+        raise HTTPException(status_code=500, detail="GCP_PROJECT_ID is not configured")
+    return f"`{settings.gcp_project_id}.{settings.bq_dataset_gold}.gold_agg_demographics_by_nta`"
+
+
 @router.get("/data-range")
 def crime_data_range() -> dict[str, object]:
     sql = f"""
@@ -64,6 +70,7 @@ def crime_overview(
         from {table}
         where complaint_date between @start_date and @end_date
           and borough is not null
+          and borough not in ('(NULL)', 'NULL', 'N/A', 'UNKNOWN')
         group by borough
         order by crime_count desc
     """
@@ -122,6 +129,67 @@ def crime_overview(
         order by crime_count desc
         limit @top_n
     """
+    hourly_density_sql = f"""
+        select
+          complaint_day_of_week as day_of_week,
+          complaint_hour as hour,
+          count(*) as crime_count
+        from {table}
+        where complaint_date between @start_date and @end_date
+          and complaint_day_of_week is not null
+          and complaint_hour is not null
+        group by day_of_week, hour
+        order by day_of_week, hour
+    """
+    demographic_sql = f"""
+        with crime as (
+          select borough, count(*) as crime_count
+          from {table}
+          where complaint_date between @start_date and @end_date
+            and borough is not null
+            and borough not in ('(NULL)', 'NULL', 'N/A', 'UNKNOWN')
+          group by borough
+        ),
+        demographics as (
+          select
+            upper(borough) as borough,
+            sum(total_population) as total_population,
+            safe_divide(sum(poverty_count), nullif(sum(total_population), 0)) as poverty_rate,
+            safe_divide(
+              sum(renter_occupied_units),
+              nullif(sum(renter_occupied_units + owner_occupied_units), 0)
+            ) as renter_share,
+            safe_divide(
+              sum(bachelors_or_higher_count),
+              nullif(sum(education_pop_25_plus), 0)
+            ) as bachelors_or_higher_share,
+            safe_divide(
+              sum(approx_median_household_income * total_population),
+              nullif(sum(total_population), 0)
+            ) as approx_median_household_income,
+            safe_divide(
+              sum(approx_median_gross_rent * renter_occupied_units),
+              nullif(sum(renter_occupied_units), 0)
+            ) as approx_median_gross_rent
+          from {_demographics_table()}
+          where borough is not null
+          group by upper(borough)
+        )
+        select
+          demographics.borough,
+          demographics.total_population,
+          demographics.poverty_rate,
+          demographics.renter_share,
+          demographics.bachelors_or_higher_share,
+          demographics.approx_median_household_income,
+          demographics.approx_median_gross_rent,
+          crime.crime_count,
+          safe_divide(crime.crime_count, nullif(demographics.total_population, 0)) * 100000
+            as crime_rate_per_100k
+        from demographics
+        join crime using (borough)
+        order by crime_rate_per_100k desc
+    """
     total_sql = f"""
         select count(*) as row_count
         from {table}
@@ -130,6 +198,7 @@ def crime_overview(
     map_points_sql = f"""
         select
           complaint_id,
+          source_dataset,
           complaint_date,
           borough,
           law_category,
@@ -155,6 +224,8 @@ def crime_overview(
         "by_law_category": service.query(by_law_sql, params=date_params),
         "daily_trend": service.query(daily_sql, params=date_params),
         "top_offenses": service.query(top_offense_sql, params=top_params),
+        "hourly_density": service.query(hourly_density_sql, params=date_params),
+        "demographics_by_borough": service.query(demographic_sql, params=date_params),
         "map_points": service.query(map_points_sql, params=map_params),
     }
 
