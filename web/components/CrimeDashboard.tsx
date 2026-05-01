@@ -554,6 +554,12 @@ export function CrimeDashboard(props: {
     crimes: row.crime_count,
   }));
   const mapPoints = (props.overview.map_points ?? []).filter((point) => isValidBorough(point.borough));
+  const topBorough = boroughData[0];
+  const topOffense = props.overview.top_offenses[0];
+  const peakHour = hourlyDensity.reduce<HourlyDensityRow | null>(
+    (best, row) => (!best || row.crime_count > best.crime_count ? row : best),
+    null,
+  );
 
   return (
     <div style={{ display: "grid", gap: "1.5rem" }}>
@@ -590,10 +596,11 @@ export function CrimeDashboard(props: {
         density={hourlyDensity}
       />
 
-      <section style={CARD_STYLE}>
+      <section className="paper-card news-feature">
+        <div>
         <span className="section-label">Borough Risk Ranking</span>
-        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Reported crime by borough</h3>
-        <div style={{ width: "100%", height: 320 }}>
+        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Which borough made the front page?</h3>
+        <div className="chart-window" style={{ height: 320 }}>
           <ResponsiveContainer>
             <BarChart data={boroughData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#cdb98b" />
@@ -609,12 +616,43 @@ export function CrimeDashboard(props: {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        <p className="chart-caption">Live chart, framed as today's borough leaderboard from the NYPD complaint mart.</p>
+        </div>
+        <aside className="feature-copy">
+          <span className="stamp">Borough Wars</span>
+          <p className="mini-headline">{topBorough?.borough ?? "NYC"} takes the loudest headline</p>
+          <p>
+            This ranking is not a moral scorecard. It is the selected window's reported-event volume,
+            filtered to usable geocoded NYC records.
+          </p>
+          <div className="feature-stat">
+            <span>Top borough count</span>
+            <strong>{formatCompact(topBorough?.crimes)}</strong>
+          </div>
+          <div className="classified-strip">
+            <div className="classified-item">Editor note: compare with population-normalized views before judging any borough.</div>
+            <div className="classified-item">Tip: use the Map Room for street-level density instead of borough totals.</div>
+          </div>
+        </aside>
       </section>
 
-      <section style={CARD_STYLE}>
+      <section className="paper-card news-feature reverse">
+        <aside className="feature-copy">
+          <span className="stamp">Late Edition</span>
+          <p className="mini-headline">Midnight does not own the chaos</p>
+          <p>
+            Hover the line to see which offense types drove each daily movement. The chart stays live,
+            but the surrounding copy makes it feel like a newsroom clipping.
+          </p>
+          <div className="classified-strip">
+            <div className="classified-item">Watch for streaks, not just one-day spikes.</div>
+            <div className="classified-item">Daily totals can move with reporting lag and seasonality.</div>
+          </div>
+        </aside>
+        <div>
         <span className="section-label">Biggest Spike Watch</span>
         <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Daily reported crime trend</h3>
-        <div style={{ width: "100%", height: 320 }}>
+        <div className="chart-window" style={{ height: 320 }}>
           <ResponsiveContainer>
             <AreaChart data={trendData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <defs>
@@ -639,12 +677,16 @@ export function CrimeDashboard(props: {
             </AreaChart>
           </ResponsiveContainer>
         </div>
+        <p className="chart-caption">Daily count with hover breakdown by top offense types.</p>
+        </div>
       </section>
 
-      <section style={CARD_STYLE}>
-        <span className="section-label">Trouble Type</span>
-        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Severity mix</h3>
-        <div style={{ width: "100%", height: 280 }}>
+      <section className="poster-card">
+        <h3>Severity mix</h3>
+        <p className="blotter-note">
+          Not all trouble is built the same. Felonies, misdemeanors, and violations get their own ink.
+        </p>
+        <div className="chart-window" style={{ height: 280 }}>
           <ResponsiveContainer>
             <BarChart data={lawData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#cdb98b" />
@@ -663,6 +705,13 @@ export function CrimeDashboard(props: {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        <div className="tear-tabs">
+          <span>Felony</span>
+          <span>Misdemeanor</span>
+          <span>Violation</span>
+          <span>Context</span>
+          <span>Source</span>
+        </div>
       </section>
 
       <HourlyDensityPlot rows={hourlyDensity} />
@@ -671,10 +720,11 @@ export function CrimeDashboard(props: {
 
       <RotatableRiskSpace rows={demographics} />
 
-      <section style={CARD_STYLE}>
+      <section className="paper-card news-feature">
+        <div>
         <span className="section-label">What's Hot</span>
         <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Top reported offenses</h3>
-        <div style={{ width: "100%", height: 360 }}>
+        <div className="chart-window" style={{ height: 360 }}>
           <ResponsiveContainer>
             <BarChart
               layout="vertical"
@@ -690,6 +740,25 @@ export function CrimeDashboard(props: {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        </div>
+        <aside className="feature-copy">
+          <span className="stamp">Blotter Pull</span>
+          <p className="mini-headline">{topOffense?.offense_description ?? "Top offense"} leads the column</p>
+          <p>
+            This is the ranked offense mix for the selected bulletin window. It gives the map and
+            risk calculator a punchier vocabulary than raw category codes.
+          </p>
+          <div className="feature-stat">
+            <span>Top offense count</span>
+            <strong>{formatCompact(topOffense?.crime_count)}</strong>
+          </div>
+          {peakHour ? (
+            <div className="classified-item">
+              Peak hour cell: {DAY_LABELS[peakHour.day_of_week]} {peakHour.hour}:00,{" "}
+              {formatCompact(peakHour.crime_count)} reports.
+            </div>
+          ) : null}
+        </aside>
       </section>
       </>
       ) : null}
