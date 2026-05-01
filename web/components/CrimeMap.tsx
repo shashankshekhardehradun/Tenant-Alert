@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import { GoogleMapsOverlay } from "@deck.gl/google-maps";
-import { HeatmapLayer, HexagonLayer } from "@deck.gl/aggregation-layers";
-import { ScatterplotLayer } from "@deck.gl/layers";
+import { HexagonLayer } from "@deck.gl/aggregation-layers";
+import { ScatterplotLayer, TextLayer } from "@deck.gl/layers";
 
 type CrimeMapPoint = {
   complaint_id: string;
@@ -18,8 +18,9 @@ type CrimeMapPoint = {
   longitude: number;
 };
 
-type ViewMode = "density" | "incidents" | "heat";
+type ViewMode = "density" | "incidents";
 type HoverInfo = { x: number; y: number; point: CrimeMapPoint } | null;
+type OffenseGroup = "ROBBERY" | "THEFT" | "FORGERY" | "ASSAULT" | "DRUGS" | "OTHER";
 
 const LAW_CATEGORY_COLORS: Record<string, [number, number, number]> = {
   FELONY: [180, 35, 24],
@@ -36,6 +37,95 @@ const BOROUGH_CAMERA: Record<string, google.maps.LatLngLiteral> = {
 };
 
 const ALL_SEVERITIES = ["FELONY", "MISDEMEANOR", "VIOLATION"];
+
+const OFFENSE_MARKERS: Record<OffenseGroup, { color: [number, number, number]; label: string; symbol: string }> = {
+  ROBBERY: { color: [255, 32, 110], label: "Robbery", symbol: "R" },
+  THEFT: { color: [255, 230, 0], label: "Theft", symbol: "T" },
+  FORGERY: { color: [0, 245, 255], label: "Forgery", symbol: "F" },
+  ASSAULT: { color: [255, 74, 28], label: "Assault", symbol: "A" },
+  DRUGS: { color: [57, 255, 20], label: "Drugs", symbol: "D" },
+  OTHER: { color: [190, 119, 255], label: "Other", symbol: "O" },
+};
+
+const BOROUGH_OUTLINES: Array<{ name: string; path: google.maps.LatLngLiteral[] }> = [
+  {
+    name: "MANHATTAN",
+    path: [
+      { lat: 40.701, lng: -74.019 },
+      { lat: 40.882, lng: -73.933 },
+      { lat: 40.873, lng: -73.907 },
+      { lat: 40.704, lng: -73.969 },
+    ],
+  },
+  {
+    name: "BRONX",
+    path: [
+      { lat: 40.786, lng: -73.933 },
+      { lat: 40.918, lng: -73.933 },
+      { lat: 40.914, lng: -73.765 },
+      { lat: 40.800, lng: -73.765 },
+      { lat: 40.785, lng: -73.865 },
+    ],
+  },
+  {
+    name: "QUEENS",
+    path: [
+      { lat: 40.787, lng: -73.962 },
+      { lat: 40.808, lng: -73.700 },
+      { lat: 40.578, lng: -73.713 },
+      { lat: 40.545, lng: -73.950 },
+      { lat: 40.642, lng: -73.962 },
+    ],
+  },
+  {
+    name: "BROOKLYN",
+    path: [
+      { lat: 40.739, lng: -74.043 },
+      { lat: 40.735, lng: -73.846 },
+      { lat: 40.570, lng: -73.835 },
+      { lat: 40.565, lng: -74.040 },
+      { lat: 40.646, lng: -74.052 },
+    ],
+  },
+  {
+    name: "STATEN ISLAND",
+    path: [
+      { lat: 40.651, lng: -74.260 },
+      { lat: 40.643, lng: -74.052 },
+      { lat: 40.477, lng: -74.050 },
+      { lat: 40.477, lng: -74.260 },
+    ],
+  },
+];
+
+const BOROUGH_LABELS = [
+  { name: "MANHATTAN", position: [-73.975, 40.768] as [number, number] },
+  { name: "THE BRONX", position: [-73.875, 40.848] as [number, number] },
+  { name: "QUEENS", position: [-73.815, 40.708] as [number, number] },
+  { name: "BROOKLYN", position: [-73.945, 40.64] as [number, number] },
+  { name: "STATEN ISLAND", position: [-74.155, 40.585] as [number, number] },
+];
+
+const nycTabloidMapStyle: google.maps.MapTypeStyle[] = [
+  { featureType: "all", elementType: "geometry", stylers: [{ color: "#1b1511" }] },
+  { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#e8d8b5" }] },
+  { featureType: "all", elementType: "labels.text.stroke", stylers: [{ color: "#120d0a" }, { weight: 3 }] },
+  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#8f2d24" }, { weight: 1.4 }] },
+  { featureType: "administrative.neighborhood", elementType: "labels.text.fill", stylers: [{ color: "#f4e6bf" }] },
+  { featureType: "poi", elementType: "all", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#5c4a33" }] },
+  { featureType: "transit.station", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#33261c" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#0e0a07" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#bca77b" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#5a241d" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#d39a38" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#101820" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#6f8790" }] },
+  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#211812" }] },
+  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#1a1a12" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#26301d" }] },
+];
 
 function sourceRecordUrl(point: CrimeMapPoint) {
   const dataset = point.source_dataset === "ytd" ? "5uac-w243" : "qgea-i56i";
@@ -58,12 +148,31 @@ function formatCategory(category: string) {
   return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
 }
 
+function offenseGroup(point: CrimeMapPoint): OffenseGroup {
+  const offense = point.offense_description.toUpperCase();
+  if (offense.includes("ROBBERY")) return "ROBBERY";
+  if (offense.includes("FORGERY") || offense.includes("FRAUD")) return "FORGERY";
+  if (offense.includes("LARCENY") || offense.includes("THEFT") || offense.includes("BURGLARY") || offense.includes("STOLEN")) {
+    return "THEFT";
+  }
+  if (offense.includes("ASSAULT")) return "ASSAULT";
+  if (offense.includes("DRUG") || offense.includes("CONTROLLED SUBSTANCE")) return "DRUGS";
+  return "OTHER";
+}
+
+function colorForOffense(point: CrimeMapPoint): [number, number, number] {
+  return OFFENSE_MARKERS[offenseGroup(point)].color;
+}
+
 export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID;
+  const useCloudMapStyle = process.env.NEXT_PUBLIC_USE_GOOGLE_MAP_ID === "true";
+  const activeMapId = useCloudMapStyle ? mapId : undefined;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const overlayRef = useRef<GoogleMapsOverlay | null>(null);
+  const boroughPolygonsRef = useRef<google.maps.Polygon[]>([]);
   const [enabledSeverities, setEnabledSeverities] = useState(() => new Set(ALL_SEVERITIES));
   const [viewMode, setViewMode] = useState<ViewMode>("density");
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
@@ -84,7 +193,7 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
     setOptions({
       key: apiKey,
       v: "weekly",
-      mapIds: mapId ? [mapId] : undefined,
+      mapIds: activeMapId ? [activeMapId] : undefined,
     });
 
     importLibrary("maps")
@@ -94,19 +203,40 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
         }
 
         const map = new google.maps.Map(containerRef.current, {
-          center: { lat: 40.72, lng: -73.95 },
-          zoom: 10.4,
-          mapId,
+          center: { lat: 40.705, lng: -73.94 },
+          zoom: 10.7,
+          mapId: activeMapId,
+          styles: activeMapId ? undefined : nycTabloidMapStyle,
+          backgroundColor: "#120d0a",
+          mapTypeId: google.maps.MapTypeId.SATELLITE,
           tilt: 67.5,
           heading: 28,
           gestureHandling: "greedy",
-          clickableIcons: true,
-          fullscreenControl: true,
+          clickableIcons: false,
+          fullscreenControl: false,
           mapTypeControl: false,
-          streetViewControl: true,
+          streetViewControl: false,
+          zoomControl: false,
+          rotateControl: false,
+          scaleControl: false,
+          keyboardShortcuts: false,
         });
         const overlay = new GoogleMapsOverlay({ layers: [] });
         overlay.setMap(map);
+        boroughPolygonsRef.current = BOROUGH_OUTLINES.map(
+          ({ path }) =>
+            new google.maps.Polygon({
+              clickable: false,
+              fillColor: "#ffee58",
+              fillOpacity: 0.035,
+              map,
+              paths: path,
+              strokeColor: "#ffee58",
+              strokeOpacity: 0.95,
+              strokeWeight: 3.5,
+              zIndex: 2,
+            }),
+        );
         mapRef.current = map;
         overlayRef.current = overlay;
         setStatus("");
@@ -118,11 +248,13 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
 
     return () => {
       cancelled = true;
+      boroughPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
+      boroughPolygonsRef.current = [];
       overlayRef.current?.finalize();
       overlayRef.current = null;
       mapRef.current = null;
     };
-  }, [apiKey, mapId]);
+  }, [activeMapId, apiKey]);
 
   useEffect(() => {
     if (!overlayRef.current) {
@@ -136,18 +268,18 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
           id: "crime-hexagons",
           data: filteredPoints,
           getPosition: (point) => [point.longitude, point.latitude],
-          radius: 260,
+          radius: 220,
           extruded: true,
-          elevationScale: 42,
-          elevationRange: [0, 3500],
+          elevationScale: 58,
+          elevationRange: [0, 4600],
           pickable: true,
-          coverage: 0.82,
+          coverage: 0.72,
           colorRange: [
-            [21, 112, 239, 120],
-            [124, 58, 237, 150],
-            [247, 144, 9, 175],
-            [196, 50, 10, 205],
-            [180, 35, 24, 235],
+            [44, 255, 194, 105],
+            [255, 230, 0, 145],
+            [255, 137, 6, 185],
+            [255, 32, 110, 225],
+            [255, 255, 255, 245],
           ],
           onHover: (info) => {
             if (info.object) {
@@ -159,30 +291,21 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
       );
     }
 
-    if (viewMode === "heat") {
-      layers.push(
-        new HeatmapLayer<CrimeMapPoint>({
-          id: "crime-heat-glow",
-          data: filteredPoints,
-          getPosition: (point) => [point.longitude, point.latitude],
-          getWeight: (point) => (point.law_category === "FELONY" ? 3 : point.law_category === "MISDEMEANOR" ? 2 : 1),
-          radiusPixels: 55,
-          intensity: 1.2,
-          threshold: 0.08,
-        }),
-      );
-    }
-
     if (viewMode === "incidents" || viewMode === "density") {
       layers.push(
         new ScatterplotLayer<CrimeMapPoint>({
-          id: "crime-incidents",
+          id: "crime-neon-halos",
           data: filteredPoints,
           getPosition: (point) => [point.longitude, point.latitude],
-          getFillColor: (point) => [...colorForSeverity(point.law_category), 215],
-          getLineColor: [255, 255, 255, 220],
-          getLineWidth: 1.2,
-          getRadius: (point) => (point.law_category === "FELONY" ? 55 : point.law_category === "MISDEMEANOR" ? 42 : 32),
+          getFillColor: (point) => [...colorForOffense(point), 70],
+          getLineColor: (point) => [...colorForOffense(point), 210],
+          getLineWidth: 8,
+          getRadius: (point) => {
+            const group = offenseGroup(point);
+            if (group === "ROBBERY" || group === "ASSAULT") return 120;
+            if (group === "THEFT" || group === "FORGERY") return 96;
+            return 78;
+          },
           radiusUnits: "meters",
           pickable: true,
           stroked: true,
@@ -196,8 +319,59 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
             }
           },
         }),
+        new ScatterplotLayer<CrimeMapPoint>({
+          id: "crime-neon-cores",
+          data: filteredPoints,
+          getPosition: (point) => [point.longitude, point.latitude],
+          getFillColor: (point) => [...colorForOffense(point), 245],
+          getLineColor: [255, 255, 255, 255],
+          getLineWidth: 2.5,
+          getRadius: (point) => {
+            const group = offenseGroup(point);
+            if (group === "ROBBERY" || group === "ASSAULT") return 46;
+            if (group === "THEFT" || group === "FORGERY") return 38;
+            return 32;
+          },
+          radiusUnits: "meters",
+          pickable: false,
+          stroked: true,
+          filled: true,
+        }),
+        new TextLayer<CrimeMapPoint>({
+          id: "crime-offense-glyphs",
+          data: filteredPoints,
+          getPosition: (point) => [point.longitude, point.latitude],
+          getText: (point) => OFFENSE_MARKERS[offenseGroup(point)].symbol,
+          getColor: [5, 5, 5, 255],
+          getSize: 13,
+          getTextAnchor: "middle",
+          getAlignmentBaseline: "center",
+          fontFamily: "Impact, Arial Narrow, sans-serif",
+          fontWeight: "bold",
+          pickable: false,
+          sizeUnits: "pixels",
+        }),
       );
     }
+
+    layers.push(
+      new TextLayer<(typeof BOROUGH_LABELS)[number]>({
+        id: "borough-map-labels",
+        data: BOROUGH_LABELS,
+        getPosition: (label) => label.position,
+        getText: (label) => label.name,
+        getColor: [248, 237, 207, 235],
+        getSize: 18,
+        getTextAnchor: "middle",
+        getAlignmentBaseline: "center",
+        fontFamily: "Impact, Arial Narrow, sans-serif",
+        fontWeight: "bold",
+        outlineColor: [0, 0, 0, 255],
+        outlineWidth: 4,
+        pickable: false,
+        sizeUnits: "pixels",
+      }),
+    );
 
     overlayRef.current.setProps({ layers });
   }, [filteredPoints, viewMode]);
@@ -245,59 +419,95 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
     });
   };
 
+  const offenseCounts = filteredPoints.reduce<Record<OffenseGroup, number>>(
+    (counts, point) => {
+      const group = offenseGroup(point);
+      counts[group] += 1;
+      return counts;
+    },
+    { ROBBERY: 0, THEFT: 0, FORGERY: 0, ASSAULT: 0, DRUGS: 0, OTHER: 0 },
+  );
+  const topOffenseGroup = Object.entries(offenseCounts).sort((a, b) => b[1] - a[1])[0] as [OffenseGroup, number];
+  const felonyCount = filteredPoints.filter((point) => point.law_category === "FELONY").length;
+
   return (
     <div style={{ display: "grid", gap: "1rem" }}>
       <div
-        className="control-strip"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "0.75rem",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-          {ALL_SEVERITIES.map((severity) => (
-            <button
-              className="tabloid-button"
-              key={severity}
-              onClick={() => toggleSeverity(severity)}
-              style={{
-                background: enabledSeverities.has(severity) ? `rgb(${colorForSeverity(severity).join(",")})` : "#f2f4f7",
-                color: enabledSeverities.has(severity) ? "#f8edcf" : "#17110d",
-              }}
-              type="button"
-            >
-              {formatCategory(severity)}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-          {(["density", "incidents", "heat"] as const).map((mode) => (
-            <button
-              className={viewMode === mode ? "tabloid-button active" : "tabloid-button"}
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              type="button"
-            >
-              {mode === "density" ? "3D Density" : mode === "incidents" ? "Incidents" : "Heat"}
-            </button>
-          ))}
-          <button className="tabloid-button" onClick={resetCamera} type="button">Reset NYC</button>
-          <button className="tabloid-button" onClick={tiltCamera} type="button">Tilt 3D</button>
-          <button className="tabloid-button" onClick={tourBoroughs} type="button">Borough Tour</button>
-        </div>
-      </div>
-
-      <div
         className="map-frame"
         style={{
-          height: 680,
+          height: 740,
           overflow: "hidden",
           position: "relative",
         }}
       >
         <div ref={containerRef} style={{ height: "100%", width: "100%" }} />
+        <aside className="map-control-panel">
+          <p className="map-panel-kicker">Layer Control</p>
+          {ALL_SEVERITIES.map((severity) => (
+            <label key={severity} className="map-check-row">
+              <input
+                checked={enabledSeverities.has(severity)}
+                onChange={() => toggleSeverity(severity)}
+                type="checkbox"
+              />
+              <span>{formatCategory(severity)}</span>
+            </label>
+          ))}
+          <p className="map-panel-kicker">Time View</p>
+          {(["density", "incidents"] as const).map((mode) => (
+            <button
+              className={viewMode === mode ? "map-pill active" : "map-pill"}
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              type="button"
+            >
+              {mode === "density" ? "3D Hot Columns" : "Neon Incidents"}
+            </button>
+          ))}
+          <p className="map-panel-kicker">Camera</p>
+          <button className="map-pill" onClick={resetCamera} type="button">Reset NYC</button>
+          <button className="map-pill" onClick={tiltCamera} type="button">Tilt 3D</button>
+          <button className="map-pill" onClick={tourBoroughs} type="button">Borough Tour</button>
+        </aside>
+        <aside className="map-stat-stack">
+          <div>
+            <span>Incidents Live</span>
+            <strong>{filteredPoints.length.toLocaleString()}</strong>
+          </div>
+          <div>
+            <span>Hot Layer</span>
+            <strong>{viewMode === "density" ? "3D" : "PINS"}</strong>
+          </div>
+          <div>
+            <span>Top Type</span>
+            <strong>{OFFENSE_MARKERS[topOffenseGroup[0]].label}</strong>
+          </div>
+          <div>
+            <span>Felony Sample</span>
+            <strong>{felonyCount.toLocaleString()}</strong>
+          </div>
+        </aside>
+        <div className="map-risk-legend">
+          <span><i style={{ background: "#2cffc2" }} /> Low Risk</span>
+          <span><i style={{ background: "#ffe600" }} /> Medium Risk</span>
+          <span><i style={{ background: "#ff5f1f" }} /> High Risk</span>
+          <span><i style={{ background: "#ff206e" }} /> Very High Risk</span>
+        </div>
+        <div className="map-offense-legend">
+          {Object.entries(OFFENSE_MARKERS).map(([key, marker]) => (
+            <span key={key}>
+              <i style={{ background: `rgb(${marker.color.join(",")})` }}>{marker.symbol}</i>
+              {marker.label}
+            </span>
+          ))}
+        </div>
+        <div className="map-headline-strip">
+          <strong>Latest Headline</strong>
+          <span>
+            {OFFENSE_MARKERS[topOffenseGroup[0]].label} markers dominate the visible sample with {topOffenseGroup[1].toLocaleString()} mapped reports.
+          </span>
+          <button onClick={() => setSelectedPoint(filteredPoints[0] ?? null)} type="button">View Blotter</button>
+        </div>
         {status ? (
           <div
             style={{
