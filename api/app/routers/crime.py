@@ -48,15 +48,20 @@ def crime_overview(
     end_date: Annotated[date, Query(..., description="Inclusive end date.")],
     top_n: Annotated[int, Query(ge=1, le=25)] = 10,
     map_limit: Annotated[int, Query(ge=1, le=5000)] = 1500,
+    borough: Annotated[str | None, Query(description="Optional uppercase NYC borough filter.")] = None,
 ) -> dict[str, object]:
     if start_date > end_date:
         raise HTTPException(status_code=400, detail="start_date must be on or before end_date")
 
     table = _crime_table()
+    borough_name = borough.upper().strip() if borough else None
+    borough_filter = "and borough = @borough" if borough_name else ""
     date_params = [
         bigquery.ScalarQueryParameter("start_date", "DATE", start_date.isoformat()),
         bigquery.ScalarQueryParameter("end_date", "DATE", end_date.isoformat()),
     ]
+    if borough_name:
+        date_params.append(bigquery.ScalarQueryParameter("borough", "STRING", borough_name))
     top_params = [
         *date_params,
         bigquery.ScalarQueryParameter("top_n", "INT64", top_n),
@@ -71,6 +76,7 @@ def crime_overview(
         where complaint_date between @start_date and @end_date
           and borough is not null
           and borough not in ('(NULL)', 'NULL', 'N/A', 'UNKNOWN')
+          {borough_filter}
         group by borough
         order by crime_count desc
     """
@@ -79,6 +85,7 @@ def crime_overview(
         from {table}
         where complaint_date between @start_date and @end_date
           and law_category is not null
+          {borough_filter}
         group by law_category
         order by crime_count desc
     """
@@ -87,6 +94,7 @@ def crime_overview(
           select complaint_date as day, count(*) as crime_count
           from {table}
           where complaint_date between @start_date and @end_date
+            {borough_filter}
           group by day
         ),
         daily_offenses as (
@@ -101,6 +109,7 @@ def crime_overview(
           from {table}
           where complaint_date between @start_date and @end_date
             and offense_description is not null
+            {borough_filter}
           group by day, offense_description
         )
         select
@@ -125,6 +134,7 @@ def crime_overview(
         from {table}
         where complaint_date between @start_date and @end_date
           and offense_description is not null
+          {borough_filter}
         group by offense_description, law_category
         order by crime_count desc
         limit @top_n
@@ -138,6 +148,7 @@ def crime_overview(
         where complaint_date between @start_date and @end_date
           and complaint_day_of_week is not null
           and complaint_hour is not null
+          {borough_filter}
         group by day_of_week, hour
         order by day_of_week, hour
     """
@@ -148,6 +159,7 @@ def crime_overview(
           where complaint_date between @start_date and @end_date
             and borough is not null
             and borough not in ('(NULL)', 'NULL', 'N/A', 'UNKNOWN')
+            {borough_filter}
           group by borough
         ),
         demographics as (
@@ -194,6 +206,7 @@ def crime_overview(
         select count(*) as row_count
         from {table}
         where complaint_date between @start_date and @end_date
+          {borough_filter}
     """
     map_points_sql = f"""
         select
@@ -210,6 +223,7 @@ def crime_overview(
         where complaint_date between @start_date and @end_date
           and latitude is not null
           and longitude is not null
+          {borough_filter}
         order by abs(farm_fingerprint(complaint_id))
         limit @map_limit
     """

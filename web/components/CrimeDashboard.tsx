@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CrimeMap } from "./CrimeMap";
+import BronxImage from "./images/Bronx.png";
+import BrooklynImage from "./images/Brooklyn.png";
+import ManhattanImage from "./images/Manhattan.png";
+import QueensImage from "./images/Queens.png";
+import StatenIslandImage from "./images/Staten_Island.png";
 import {
   Area,
   AreaChart,
@@ -75,6 +80,14 @@ const BOROUGH_COLORS: Record<string, string> = {
   MANHATTAN: "#6f3f1d",
   QUEENS: "#2f6d4f",
   "STATEN ISLAND": "#d89222",
+};
+
+const BOROUGH_IMAGES: Record<string, string> = {
+  BRONX: BronxImage.src,
+  BROOKLYN: BrooklynImage.src,
+  MANHATTAN: ManhattanImage.src,
+  QUEENS: QueensImage.src,
+  "STATEN ISLAND": StatenIslandImage.src,
 };
 
 const VALID_BOROUGHS = new Set(Object.keys(BOROUGH_COLORS));
@@ -252,20 +265,32 @@ function MetricCards({
   boroughs,
   topOffense,
   density,
+  demographics,
 }: {
   rowCount: number;
   boroughs: BoroughCrimeRow[];
   topOffense?: TopOffenseRow;
   density: HourlyDensityRow[];
+  demographics: DemographicBoroughRow[];
 }) {
   const peakCell = density.reduce<HourlyDensityRow | null>(
     (best, row) => (!best || row.crime_count > best.crime_count ? row : best),
     null,
   );
   const topBorough = boroughs[0];
+  const highestRate = demographics.reduce<DemographicBoroughRow | null>(
+    (best, row) =>
+      !best || (row.crime_rate_per_100k ?? 0) > (best.crime_rate_per_100k ?? 0) ? row : best,
+    null,
+  );
   const metrics = [
     { label: "Today's Trouble Index", value: rowCount.toLocaleString(), detail: "Geocoded NYPD reports in this issue" },
     { label: "Borough on blast", value: topBorough?.borough ?? "n/a", detail: `${formatCompact(topBorough?.crime_count)} reports filed` },
+    {
+      label: "Rate-adjusted heat",
+      value: highestRate?.borough ?? "n/a",
+      detail: `${(highestRate?.crime_rate_per_100k ?? 0).toFixed(1)} reports per 100k`,
+    },
     { label: "Front-page offense", value: topOffense?.offense_description ?? "n/a", detail: `${formatCompact(topOffense?.crime_count)} mentions` },
     {
       label: "Most chaotic hour",
@@ -277,10 +302,10 @@ function MetricCards({
   return (
     <section style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
       {metrics.map((metric) => (
-        <div key={metric.label} className="paper-card" style={{ ...CARD_STYLE, background: "#17110d", color: "#f8edcf" }}>
-          <p style={{ margin: "0 0 0.35rem", opacity: 0.75 }}>{metric.label}</p>
-          <strong style={{ display: "block", fontFamily: "Impact, Arial Narrow, sans-serif", fontSize: "1.75rem", lineHeight: 1, textTransform: "uppercase" }}>{metric.value}</strong>
-          <p style={{ margin: "0.45rem 0 0", opacity: 0.75 }}>{metric.detail}</p>
+        <div key={metric.label} className="paper-card metric-card">
+          <p className="metric-label">{metric.label}</p>
+          <strong className="metric-value">{metric.value}</strong>
+          <p className="metric-detail">{metric.detail}</p>
         </div>
       ))}
     </section>
@@ -405,6 +430,56 @@ function SocioeconomicScatter({ rows }: { rows: DemographicBoroughRow[] }) {
   );
 }
 
+function SocioeconomicMagazineLens({ rows }: { rows: DemographicBoroughRow[] }) {
+  const data = rows.filter((row) => isValidBorough(row.borough));
+  const maxRate = Math.max(...data.map((row) => row.crime_rate_per_100k ?? 0), 1);
+  const maxPoverty = Math.max(...data.map((row) => row.poverty_rate ?? 0), 0.01);
+
+  return (
+    <section className="paper-card magazine-lens torn-edge">
+      <div>
+        <span className="section-label">Social & Economic Lens</span>
+        <h3>Neighborhood archetypes, not a 3D notebook chart</h3>
+        <p className="blotter-note">
+          The same information from the old rotatable plot is now laid out like a magazine explainer:
+          crime rate, poverty, renter share, median income, and rent pressure side by side.
+        </p>
+      </div>
+      <div className="lens-grid">
+        {data.map((row) => {
+          const rate = row.crime_rate_per_100k ?? 0;
+          const poverty = row.poverty_rate ?? 0;
+          return (
+            <article key={row.borough} className="lens-card">
+              <img
+                alt={`${row.borough} evidence illustration`}
+                src={BOROUGH_IMAGES[row.borough] ?? "/evidence/borough-map.svg"}
+              />
+              <div>
+                <h4>{row.borough}</h4>
+                <p>{formatCurrency(row.approx_median_household_income)} median income</p>
+              </div>
+              <div className="lens-meter">
+                <span>Crime rate</span>
+                <i style={{ width: `${Math.max(8, (rate / maxRate) * 100)}%` }} />
+                <strong>{rate.toFixed(1)} per 100k</strong>
+              </div>
+              <div className="lens-meter poverty">
+                <span>Poverty pressure</span>
+                <i style={{ width: `${Math.max(8, (poverty / maxPoverty) * 100)}%` }} />
+                <strong>{formatPercent(row.poverty_rate)}</strong>
+              </div>
+              <p className="lens-footnote">
+                Renters: {formatPercent(row.renter_share)} · Gross rent: {formatCurrency(row.approx_median_gross_rent)}
+              </p>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function RotatableRiskSpace({ rows }: { rows: DemographicBoroughRow[] }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState("Loading 3D view...");
@@ -465,13 +540,39 @@ function RotatableRiskSpace({ rows }: { rows: DemographicBoroughRow[] }) {
           ],
           {
             autosize: true,
+            font: { color: "#17110d", family: "Georgia, Times New Roman, serif" },
             margin: { l: 0, r: 0, t: 0, b: 0 },
             paper_bgcolor: "rgba(0,0,0,0)",
             plot_bgcolor: "rgba(0,0,0,0)",
             scene: {
-              xaxis: { title: "Poverty rate (%)", tickformat: ".0f" },
-              yaxis: { title: "Renter share (%)", tickformat: ".0f" },
-              zaxis: { title: "Median income ($)", tickprefix: "$" },
+              bgcolor: "#f4e3bf",
+              xaxis: {
+                backgroundcolor: "#efe1bf",
+                color: "#17110d",
+                gridcolor: "#bfa779",
+                showbackground: true,
+                title: "Poverty rate (%)",
+                tickformat: ".0f",
+                zerolinecolor: "#17110d",
+              },
+              yaxis: {
+                backgroundcolor: "#efe1bf",
+                color: "#17110d",
+                gridcolor: "#bfa779",
+                showbackground: true,
+                title: "Renter share (%)",
+                tickformat: ".0f",
+                zerolinecolor: "#17110d",
+              },
+              zaxis: {
+                backgroundcolor: "#efe1bf",
+                color: "#17110d",
+                gridcolor: "#bfa779",
+                showbackground: true,
+                title: "Median income ($)",
+                tickprefix: "$",
+                zerolinecolor: "#17110d",
+              },
               camera: { eye: { x: 1.55, y: 1.65, z: 1.25 } },
             },
           },
@@ -500,6 +601,81 @@ function RotatableRiskSpace({ rows }: { rows: DemographicBoroughRow[] }) {
       </p>
       {status ? <p style={{ color: "#475467", margin: 0 }}>{status}</p> : null}
       <div ref={containerRef} style={{ height: 520, width: "100%" }} />
+    </section>
+  );
+}
+
+function EvidenceStringBoard({
+  demographics,
+  peakHour,
+  topBorough,
+  topOffense,
+}: {
+  demographics: DemographicBoroughRow[];
+  peakHour: HourlyDensityRow | null;
+  topBorough?: { borough: string; crimes: number };
+  topOffense?: TopOffenseRow;
+}) {
+  const highestRate = demographics.reduce<DemographicBoroughRow | null>(
+    (best, row) =>
+      !best || (row.crime_rate_per_100k ?? 0) > (best.crime_rate_per_100k ?? 0) ? row : best,
+    null,
+  );
+
+  return (
+    <section className="case-board evidence-board">
+      <span className="case-board-pin">Detective's wall: totals, timing, and context</span>
+      <svg aria-hidden="true" className="evidence-strings" viewBox="0 0 100 52" preserveAspectRatio="none">
+        <line x1="18" x2="49" y1="11" y2="24" />
+        <line x1="49" x2="82" y1="24" y2="10" />
+        <line x1="18" x2="30" y1="11" y2="42" />
+        <line x1="82" x2="68" y1="10" y2="42" />
+        <line x1="30" x2="68" y1="42" y2="42" />
+      </svg>
+      <div className="evidence-grid">
+        <article className="evidence-photo rotate-left">
+          <span className="push-pin" />
+          <img
+            alt={`${topBorough?.borough ?? "NYC"} evidence`}
+            className="photo-plate"
+            src={BOROUGH_IMAGES[topBorough?.borough ?? ""] ?? "/evidence/nyc-street.svg"}
+          />
+          <h3>{topBorough?.borough ?? "NYC"}</h3>
+          <p>Raw-count lead in the selected issue.</p>
+          <strong>{formatCompact(topBorough?.crimes)} reports</strong>
+        </article>
+        <article className="evidence-note center-note">
+          <span className="push-pin red" />
+          <p className="mini-headline">The story changes when population enters the room</p>
+          <p>
+            The case board connects volume, timing, and social context so the page reads like an
+            investigation instead of a plain dashboard.
+          </p>
+        </article>
+        <article className="evidence-photo rotate-right">
+          <span className="push-pin" />
+          <img
+            alt={`${highestRate?.borough ?? "Borough"} evidence`}
+            className="photo-plate"
+            src={BOROUGH_IMAGES[highestRate?.borough ?? ""] ?? "/evidence/borough-map.svg"}
+          />
+          <h3>{highestRate?.borough ?? "Rate view"}</h3>
+          <p>Highest population-normalized borough in the window.</p>
+          <strong>{(highestRate?.crime_rate_per_100k ?? 0).toFixed(1)} per 100k</strong>
+        </article>
+        <article className="evidence-note small">
+          <span className="push-pin red" />
+          <h4>Peak Hour</h4>
+          <p>
+            {peakHour ? `${DAY_LABELS[peakHour.day_of_week]} ${peakHour.hour}:00` : "No hour cell"}.
+          </p>
+        </article>
+        <article className="evidence-note small">
+          <span className="push-pin red" />
+          <h4>Lead Offense</h4>
+          <p>{topOffense?.offense_description ?? "No offense ranking"}.</p>
+        </article>
+      </div>
     </section>
   );
 }
@@ -563,7 +739,7 @@ export function CrimeDashboard(props: {
 
   return (
     <div style={{ display: "grid", gap: "1.5rem" }}>
-      <section className="paper-card" style={{ padding: "1rem" }}>
+      <section className="paper-card torn-edge" style={{ padding: "1rem" }}>
         <span className="section-label">Filed Window</span>
         <h2 style={{ margin: "0.55rem 0 0.75rem" }}>What the blotter is counting</h2>
         <p style={{ margin: 0, color: "#6a5947" }}>
@@ -594,12 +770,13 @@ export function CrimeDashboard(props: {
         boroughs={props.overview.by_borough.filter((row) => isValidBorough(row.borough))}
         topOffense={props.overview.top_offenses[0]}
         density={hourlyDensity}
+        demographics={demographics}
       />
 
-      <section className="paper-card news-feature">
+      <section className="paper-card news-feature torn-edge">
         <div>
-        <span className="section-label">Borough Risk Ranking</span>
-        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Which borough made the front page?</h3>
+        <span className="section-label">Borough Leaderboard</span>
+        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>All incidents, ranked by borough</h3>
         <div className="chart-window" style={{ height: 320 }}>
           <ResponsiveContainer>
             <BarChart data={boroughData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
@@ -616,7 +793,7 @@ export function CrimeDashboard(props: {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <p className="chart-caption">Live chart, framed as today's borough leaderboard from the NYPD complaint mart.</p>
+        <p className="chart-caption">All incidents in the selected filing window, ranked from loudest borough to quietest.</p>
         </div>
         <aside className="feature-copy">
           <span className="stamp">Borough Wars</span>
@@ -636,7 +813,7 @@ export function CrimeDashboard(props: {
         </aside>
       </section>
 
-      <section className="paper-card news-feature reverse">
+      <section className="paper-card news-feature reverse torn-edge">
         <aside className="feature-copy">
           <span className="stamp">Late Edition</span>
           <p className="mini-headline">Midnight does not own the chaos</p>
@@ -714,11 +891,18 @@ export function CrimeDashboard(props: {
         </div>
       </section>
 
+      <EvidenceStringBoard
+        demographics={demographics}
+        peakHour={peakHour}
+        topBorough={topBorough}
+        topOffense={topOffense}
+      />
+
       <HourlyDensityPlot rows={hourlyDensity} />
 
       <SocioeconomicScatter rows={demographics} />
 
-      <RotatableRiskSpace rows={demographics} />
+      <SocioeconomicMagazineLens rows={demographics} />
 
       <section className="paper-card news-feature">
         <div>

@@ -36,7 +36,13 @@ function clampLast90DaysUtc(minDay: string, maxDay: string): { start: string; en
   return { start: utcIsoDate(start), end: utcIsoDate(end) };
 }
 
-export async function getCrimeOverview(): Promise<{
+type CrimeOverviewOptions = {
+  borough?: string;
+  latestDayOnly?: boolean;
+  mapLimit?: number;
+};
+
+export async function getCrimeOverview(options: CrimeOverviewOptions = {}): Promise<{
   overview: CrimeOverviewPayload | null;
   error?: string;
   note?: string;
@@ -52,11 +58,36 @@ export async function getCrimeOverview(): Promise<{
     url.searchParams.set("start_date", range.start);
     url.searchParams.set("end_date", range.end);
     url.searchParams.set("top_n", "10");
-    url.searchParams.set("map_limit", "2000");
+    url.searchParams.set("map_limit", String(options.mapLimit ?? 2000));
+    if (options.borough) {
+      url.searchParams.set("borough", options.borough);
+    }
     return url.toString();
   };
 
   try {
+    if (options.latestDayOnly) {
+      const range = await fetchJson<DataRangePayload>(`${apiUrl}/crime/data-range`);
+      if (!range.ok) {
+        return { overview: null, error: `API error (${range.status}): ${range.text}` };
+      }
+      if (!range.data.max_day || range.data.row_count === 0) {
+        return {
+          overview: null,
+          error: "BigQuery crime marts look empty. Ingest NYPD complaints and run dbt before charting.",
+        };
+      }
+      const latest = { start: range.data.max_day, end: range.data.max_day };
+      const latestResponse = await fetchJson<CrimeOverviewPayload>(overviewUrl(latest));
+      if (!latestResponse.ok) {
+        return { overview: null, error: `API error (${latestResponse.status}): ${latestResponse.text}` };
+      }
+      return {
+        overview: latestResponse.data,
+        note: `Map room is showing the latest available filing day only: ${range.data.max_day}.`,
+      };
+    }
+
     const first = await fetchJson<CrimeOverviewPayload>(overviewUrl(preferred));
     if (!first.ok) {
       return { overview: null, error: `API error (${first.status}): ${first.text}` };

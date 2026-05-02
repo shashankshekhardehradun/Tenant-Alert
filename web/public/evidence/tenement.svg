@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 260" role="img" aria-labelledby="title desc">
+  <title id="title">Tenement evidence photo</title>
+  <desc id="desc">A high-contrast illustrated apartment building facade.</desc>
+  <defs>
+    <pattern id="halftone" width="8" height="8" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1" fill="#0b0b09" opacity=".25"/>
+    </pattern>
+  </defs>
+  <rect width="420" height="260" fill="#d5bd8d"/>
+  <rect x="48" y="28" width="324" height="232" fill="#33261c" stroke="#0b0b09" stroke-width="8"/>
+  <g fill="#f0dfbd" opacity=".78">
+    <rect x="78" y="58" width="42" height="34"/><rect x="142" y="58" width="42" height="34"/>
+    <rect x="236" y="58" width="42" height="34"/><rect x="300" y="58" width="42" height="34"/>
+    <rect x="78" y="116" width="42" height="34"/><rect x="142" y="116" width="42" height="34"/>
+    <rect x="236" y="116" width="42" height="34"/><rect x="300" y="116" width="42" height="34"/>
+    <rect x="78" y="174" width="42" height="34"/><rect x="142" y="174" width="42" height="34"/>
+    <rect x="236" y="174" width="42" height="34"/><rect x="300" y="174" width="42" height="34"/>
+  </g>
+  <g fill="#17110d" opacity=".72">
+    <rect x="92" y="58" width="4" height="150"/><rect x="156" y="58" width="4" height="150"/>
+    <rect x="250" y="58" width="4" height="150"/><rect x="314" y="58" width="4" height="150"/>
+    <rect x="78" y="73" width="264" height="4"/><rect x="78" y="131" width="264" height="4"/><rect x="78" y="189" width="264" height="4"/>
+  </g>
+  <path d="M188 260v-68h44v68z" fill="#0b0b09"/>
+  <path d="M37 230h346" stroke="#b33124" stroke-width="5" stroke-dasharray="18 10"/>
+  <rect width="420" height="260" fill="url(#halftone)"/>
+</svg>

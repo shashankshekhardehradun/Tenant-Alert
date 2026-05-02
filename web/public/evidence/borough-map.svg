@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 260" role="img" aria-labelledby="title desc">
+  <title id="title">Borough dossier map</title>
+  <desc id="desc">A stylized connected borough map for the evidence board.</desc>
+  <rect width="420" height="260" fill="#17110d"/>
+  <g fill="none" stroke="#f8edcf" stroke-linejoin="round" stroke-width="4" opacity=".9">
+    <path d="m194 30 45 18-10 132-30 52-30-38 2-114z"/>
+    <path d="m252 46 82 18 30 70-34 50-72-38-18-68z"/>
+    <path d="m151 105 81 44-26 83-95-21-38-58z"/>
+    <path d="m247 156 110-10 20 52-74 32-80-26z"/>
+    <path d="m68 184 61 34-37 26-54-18z"/>
+  </g>
+  <g fill="#ff206e">
+    <circle cx="211" cy="82" r="8"/><circle cx="181" cy="153" r="7"/><circle cx="300" cy="114" r="9"/>
+    <circle cx="286" cy="188" r="7"/><circle cx="85" cy="213" r="6"/>
+  </g>
+  <g stroke="#ffdf7e" stroke-width="2" opacity=".8">
+    <line x1="211" x2="300" y1="82" y2="114"/><line x1="181" x2="286" y1="153" y2="188"/>
+    <line x1="181" x2="85" y1="153" y2="213"/><line x1="211" x2="181" y1="82" y2="153"/>
+  </g>
+  <g fill="#f8edcf" font-family="Impact, Arial Narrow, sans-serif" font-size="18">
+    <text x="245" y="36">BRONX</text>
+    <text x="243" y="127">QUEENS</text>
+    <text x="94" y="143">BROOKLYN</text>
+    <text x="144" y="82">MANHATTAN</text>
+    <text x="25" y="202">S.I.</text>
+  </g>
+</svg>

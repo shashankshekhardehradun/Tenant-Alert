@@ -4,7 +4,7 @@ import { getCrimeOverview } from "../crimeOverview";
 import { CrimeDashboard } from "../../components/CrimeDashboard";
 
 export default async function MapPage() {
-  const { overview, error, note } = await getCrimeOverview();
+  const { overview, error, note } = await getCrimeOverview({ latestDayOnly: true, mapLimit: 5000 });
   return (
     <main className="bulletin-shell">
       <div className="bulletin-topline">
@@ -23,15 +23,21 @@ export default async function MapPage() {
         </div>
         <aside className="price-box" aria-label="Map room status">
           <span>Layer</span>
-          <strong>3D</strong>
-          <span>density mode</span>
+          <strong>LIVE</strong>
+          <span>severity density</span>
         </aside>
       </header>
       <nav className="bulletin-nav">
         <Link className="nav-link" href="/graphs">Front Page</Link>
         <Link className="nav-link" href="/map">The Map Room</Link>
+        <Link className="nav-link" href="/boroughs/manhattan">Borough Files</Link>
       </nav>
-      <div className="ticker">Drag, tilt, filter, investigate. Every marker links back to source data.</div>
+      <div className="ticker live-ticker">
+        <span>Latest-day map only</span>
+        <span>Drag, tilt, filter, investigate</span>
+        <span>Every marker links back to source data</span>
+        <span>Latest-day map only</span>
+      </div>
       {note ? (
         <p className="paper-card blotter-note" style={{ margin: "1rem 0 0", padding: "0.75rem" }}>{note}</p>
       ) : null}
