@@ -9,3 +9,19 @@ output "artifacts_bucket_name" {
 output "workload_service_account_email" {
   value = google_service_account.workload_sa.email
 }
+
+output "artifact_registry_repository" {
+  value = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.containers.repository_id}"
+}
+
+output "api_url" {
+  value = try(google_cloud_run_v2_service.api[0].uri, "")
+}
+
+output "web_url" {
+  value = try(google_cloud_run_v2_service.web[0].uri, "")
+}
+
+output "daily_refresh_job" {
+  value = try(google_cloud_run_v2_job.daily_refresh[0].name, "")
+}

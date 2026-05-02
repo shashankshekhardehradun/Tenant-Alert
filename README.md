@@ -92,6 +92,16 @@ See `docs/bigquery_tables.md` for the broader table inventory and starter EDA qu
 
 - `docker compose up`
 
+## Deploy to GCP
+
+Use `docs/deployment.md` for the production runbook. The current deployment path uses:
+
+- Cloud Run service for FastAPI.
+- Cloud Run service for Next.js.
+- Cloud Run Job for daily NYPD ingestion, dbt mart rebuilds, BQML retraining, feature importance, and latest predictions.
+- Cloud Scheduler to run the refresh job every morning.
+- Artifact Registry for API, worker, and web containers.
+
 ## Run API locally
 
 - `uvicorn api.app.main:app --reload --port 8000`
@@ -218,5 +228,5 @@ For Dagster, open the UI and materialize the `nyc311_raw_partition` asset. Local
 - Add borough/NTA boundary polygons and normalized per-capita choropleths.
 - Add filterable time windows and offense-family controls.
 - Add narrative "borough tour" camera sequences for demos.
-- Add ML-assisted historical commonality explorer for offense patterns by context.
-- Deploy API and web services to Cloud Run with a public demo URL.
+- Improve BQML risk score calibration and add offline model evaluation panels.
+- Add custom domain, CDN, and production monitoring dashboards.
