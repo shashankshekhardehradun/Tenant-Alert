@@ -23,15 +23,21 @@ export default async function GraphsPage() {
         </div>
         <aside className="price-box" aria-label="Bulletin price">
           <span>Only</span>
-          <strong>25c</strong>
+          <strong>25¢</strong>
           <span>plus tax and anxiety</span>
         </aside>
       </header>
       <nav className="bulletin-nav">
         <Link className="nav-link" href="/graphs">Front Page</Link>
         <Link className="nav-link" href="/map">The Map Room</Link>
+        <Link className="nav-link" href="/boroughs/manhattan">Borough Files</Link>
       </nav>
-      <div className="ticker">Stay woke. Stay safe. This is NYC. Data refreshed from BigQuery gold marts.</div>
+      <div className="ticker live-ticker">
+        <span>Stay woke. Stay safe. This is NYC.</span>
+        <span>Data refreshed from BigQuery gold marts.</span>
+        <span>Population-normalized risk now on page one.</span>
+        <span>Stay woke. Stay safe. This is NYC.</span>
+      </div>
       {note ? (
         <p className="paper-card blotter-note" style={{ margin: "1rem 0 0", padding: "0.75rem" }}>{note}</p>
       ) : null}

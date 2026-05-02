@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CrimeMap } from "./CrimeMap";
+import BronxImage from "./images/Bronx.png";
+import BrooklynImage from "./images/Brooklyn.png";
+import ManhattanImage from "./images/Manhattan.png";
+import QueensImage from "./images/Queens.png";
+import StatenIslandImage from "./images/Staten_Island.png";
 import {
   Area,
   AreaChart,
@@ -75,6 +80,14 @@ const BOROUGH_COLORS: Record<string, string> = {
   MANHATTAN: "#6f3f1d",
   QUEENS: "#2f6d4f",
   "STATEN ISLAND": "#d89222",
+};
+
+const BOROUGH_IMAGES: Record<string, string> = {
+  BRONX: BronxImage.src,
+  BROOKLYN: BrooklynImage.src,
+  MANHATTAN: ManhattanImage.src,
+  QUEENS: QueensImage.src,
+  "STATEN ISLAND": StatenIslandImage.src,
 };
 
 const VALID_BOROUGHS = new Set(Object.keys(BOROUGH_COLORS));
@@ -289,10 +302,10 @@ function MetricCards({
   return (
     <section style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
       {metrics.map((metric) => (
-        <div key={metric.label} className="paper-card" style={{ ...CARD_STYLE, background: "#17110d", color: "#f8edcf" }}>
-          <p style={{ margin: "0 0 0.35rem", opacity: 0.75 }}>{metric.label}</p>
-          <strong style={{ display: "block", fontFamily: "Impact, Arial Narrow, sans-serif", fontSize: "1.75rem", lineHeight: 1, textTransform: "uppercase" }}>{metric.value}</strong>
-          <p style={{ margin: "0.45rem 0 0", opacity: 0.75 }}>{metric.detail}</p>
+        <div key={metric.label} className="paper-card metric-card">
+          <p className="metric-label">{metric.label}</p>
+          <strong className="metric-value">{metric.value}</strong>
+          <p className="metric-detail">{metric.detail}</p>
         </div>
       ))}
     </section>
@@ -412,6 +425,56 @@ function SocioeconomicScatter({ rows }: { rows: DemographicBoroughRow[] }) {
         <span><strong>Y axis:</strong> median household income</span>
         <span><strong>Bubble size:</strong> crimes per 100k residents</span>
         <span><strong>Color:</strong> borough</span>
+      </div>
+    </section>
+  );
+}
+
+function SocioeconomicMagazineLens({ rows }: { rows: DemographicBoroughRow[] }) {
+  const data = rows.filter((row) => isValidBorough(row.borough));
+  const maxRate = Math.max(...data.map((row) => row.crime_rate_per_100k ?? 0), 1);
+  const maxPoverty = Math.max(...data.map((row) => row.poverty_rate ?? 0), 0.01);
+
+  return (
+    <section className="paper-card magazine-lens torn-edge">
+      <div>
+        <span className="section-label">Social & Economic Lens</span>
+        <h3>Neighborhood archetypes, not a 3D notebook chart</h3>
+        <p className="blotter-note">
+          The same information from the old rotatable plot is now laid out like a magazine explainer:
+          crime rate, poverty, renter share, median income, and rent pressure side by side.
+        </p>
+      </div>
+      <div className="lens-grid">
+        {data.map((row) => {
+          const rate = row.crime_rate_per_100k ?? 0;
+          const poverty = row.poverty_rate ?? 0;
+          return (
+            <article key={row.borough} className="lens-card">
+              <img
+                alt={`${row.borough} evidence illustration`}
+                src={BOROUGH_IMAGES[row.borough] ?? "/evidence/borough-map.svg"}
+              />
+              <div>
+                <h4>{row.borough}</h4>
+                <p>{formatCurrency(row.approx_median_household_income)} median income</p>
+              </div>
+              <div className="lens-meter">
+                <span>Crime rate</span>
+                <i style={{ width: `${Math.max(8, (rate / maxRate) * 100)}%` }} />
+                <strong>{rate.toFixed(1)} per 100k</strong>
+              </div>
+              <div className="lens-meter poverty">
+                <span>Poverty pressure</span>
+                <i style={{ width: `${Math.max(8, (poverty / maxPoverty) * 100)}%` }} />
+                <strong>{formatPercent(row.poverty_rate)}</strong>
+              </div>
+              <p className="lens-footnote">
+                Renters: {formatPercent(row.renter_share)} · Gross rent: {formatCurrency(row.approx_median_gross_rent)}
+              </p>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -572,7 +635,11 @@ function EvidenceStringBoard({
       <div className="evidence-grid">
         <article className="evidence-photo rotate-left">
           <span className="push-pin" />
-          <div className="photo-plate skyline" />
+          <img
+            alt={`${topBorough?.borough ?? "NYC"} evidence`}
+            className="photo-plate"
+            src={BOROUGH_IMAGES[topBorough?.borough ?? ""] ?? "/evidence/nyc-street.svg"}
+          />
           <h3>{topBorough?.borough ?? "NYC"}</h3>
           <p>Raw-count lead in the selected issue.</p>
           <strong>{formatCompact(topBorough?.crimes)} reports</strong>
@@ -587,7 +654,11 @@ function EvidenceStringBoard({
         </article>
         <article className="evidence-photo rotate-right">
           <span className="push-pin" />
-          <div className="photo-plate tenement" />
+          <img
+            alt={`${highestRate?.borough ?? "Borough"} evidence`}
+            className="photo-plate"
+            src={BOROUGH_IMAGES[highestRate?.borough ?? ""] ?? "/evidence/borough-map.svg"}
+          />
           <h3>{highestRate?.borough ?? "Rate view"}</h3>
           <p>Highest population-normalized borough in the window.</p>
           <strong>{(highestRate?.crime_rate_per_100k ?? 0).toFixed(1)} per 100k</strong>
@@ -704,8 +775,8 @@ export function CrimeDashboard(props: {
 
       <section className="paper-card news-feature torn-edge">
         <div>
-        <span className="section-label">Borough Risk Ranking</span>
-        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Which borough made the front page?</h3>
+        <span className="section-label">Borough Leaderboard</span>
+        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>All incidents, ranked by borough</h3>
         <div className="chart-window" style={{ height: 320 }}>
           <ResponsiveContainer>
             <BarChart data={boroughData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
@@ -722,7 +793,7 @@ export function CrimeDashboard(props: {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <p className="chart-caption">Live chart, framed as today's borough leaderboard from the NYPD complaint mart.</p>
+        <p className="chart-caption">All incidents in the selected filing window, ranked from loudest borough to quietest.</p>
         </div>
         <aside className="feature-copy">
           <span className="stamp">Borough Wars</span>
@@ -831,7 +902,7 @@ export function CrimeDashboard(props: {
 
       <SocioeconomicScatter rows={demographics} />
 
-      <RotatableRiskSpace rows={demographics} />
+      <SocioeconomicMagazineLens rows={demographics} />
 
       <section className="paper-card news-feature">
         <div>

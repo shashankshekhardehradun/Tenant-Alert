@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import { GoogleMapsOverlay } from "@deck.gl/google-maps";
-import { HexagonLayer } from "@deck.gl/aggregation-layers";
 import { ScatterplotLayer, TextLayer } from "@deck.gl/layers";
 
 type CrimeMapPoint = {
@@ -26,14 +25,6 @@ const LAW_CATEGORY_COLORS: Record<string, [number, number, number]> = {
   FELONY: [180, 35, 24],
   MISDEMEANOR: [247, 144, 9],
   VIOLATION: [21, 112, 239],
-};
-
-const BOROUGH_CAMERA: Record<string, google.maps.LatLngLiteral> = {
-  BRONX: { lat: 40.8448, lng: -73.8648 },
-  BROOKLYN: { lat: 40.6501, lng: -73.9496 },
-  MANHATTAN: { lat: 40.7831, lng: -73.9712 },
-  QUEENS: { lat: 40.7282, lng: -73.7949 },
-  "STATEN ISLAND": { lat: 40.5795, lng: -74.1502 },
 };
 
 const ALL_SEVERITIES = ["FELONY", "MISDEMEANOR", "VIOLATION"];
@@ -209,8 +200,6 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
           styles: activeMapId ? undefined : nycTabloidMapStyle,
           backgroundColor: "#120d0a",
           mapTypeId: google.maps.MapTypeId.SATELLITE,
-          tilt: 67.5,
-          heading: 28,
           gestureHandling: "greedy",
           clickableIcons: false,
           fullscreenControl: false,
@@ -264,28 +253,25 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
     const layers = [];
     if (viewMode === "density") {
       layers.push(
-        new HexagonLayer<CrimeMapPoint>({
-          id: "crime-hexagons",
+        new ScatterplotLayer<CrimeMapPoint>({
+          id: "crime-severity-density",
           data: filteredPoints,
           getPosition: (point) => [point.longitude, point.latitude],
-          radius: 220,
-          extruded: true,
-          elevationScale: 58,
-          elevationRange: [0, 4600],
+          getFillColor: (point) => [...colorForSeverity(point.law_category), 82],
+          getLineColor: (point) => [...colorForSeverity(point.law_category), 220],
+          getLineWidth: 2,
+          getRadius: (point) => (point.law_category === "FELONY" ? 165 : point.law_category === "MISDEMEANOR" ? 125 : 92),
+          radiusUnits: "meters",
           pickable: true,
-          coverage: 0.72,
-          colorRange: [
-            [44, 255, 194, 105],
-            [255, 230, 0, 145],
-            [255, 137, 6, 185],
-            [255, 32, 110, 225],
-            [255, 255, 255, 245],
-          ],
+          stroked: true,
+          filled: true,
           onHover: (info) => {
+            setHoverInfo(info.object ? { x: info.x, y: info.y, point: info.object } : null);
+          },
+          onClick: (info) => {
             if (info.object) {
-              setHoverInfo(null);
+              setSelectedPoint(info.object);
             }
-            return false;
           },
         }),
       );
@@ -392,30 +378,6 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
     mapRef.current?.moveCamera({
       center: { lat: 40.72, lng: -73.95 },
       zoom: 10.4,
-      tilt: 67.5,
-      heading: 28,
-    });
-  };
-
-  const tiltCamera = () => {
-    mapRef.current?.moveCamera({
-      tilt: 67.5,
-      heading: ((mapRef.current.getHeading() ?? 0) + 55) % 360,
-      zoom: Math.max(mapRef.current.getZoom() ?? 10.4, 11),
-    });
-  };
-
-  const tourBoroughs = () => {
-    const boroughs = Object.values(BOROUGH_CAMERA);
-    boroughs.forEach((center, index) => {
-      window.setTimeout(() => {
-        mapRef.current?.moveCamera({
-          center,
-          zoom: 12,
-          tilt: 67.5,
-          heading: index * 42,
-        });
-      }, index * 950);
     });
   };
 
@@ -453,7 +415,7 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
               <span>{formatCategory(severity)}</span>
             </label>
           ))}
-          <p className="map-panel-kicker">Time View</p>
+          <p className="map-panel-kicker">Map View</p>
           {(["density", "incidents"] as const).map((mode) => (
             <button
               className={viewMode === mode ? "map-pill active" : "map-pill"}
@@ -461,13 +423,11 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
               onClick={() => setViewMode(mode)}
               type="button"
             >
-              {mode === "density" ? "3D Hot Columns" : "Neon Incidents"}
+              {mode === "density" ? "Severity Density" : "Neon Incidents"}
             </button>
           ))}
           <p className="map-panel-kicker">Camera</p>
           <button className="map-pill" onClick={resetCamera} type="button">Reset NYC</button>
-          <button className="map-pill" onClick={tiltCamera} type="button">Tilt 3D</button>
-          <button className="map-pill" onClick={tourBoroughs} type="button">Borough Tour</button>
         </aside>
         <aside className="map-stat-stack">
           <div>
@@ -476,7 +436,7 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
           </div>
           <div>
             <span>Hot Layer</span>
-            <strong>{viewMode === "density" ? "3D" : "PINS"}</strong>
+            <strong>{viewMode === "density" ? "DENSITY" : "PINS"}</strong>
           </div>
           <div>
             <span>Top Type</span>
@@ -488,10 +448,9 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
           </div>
         </aside>
         <div className="map-risk-legend">
-          <span><i style={{ background: "#2cffc2" }} /> Low Risk</span>
-          <span><i style={{ background: "#ffe600" }} /> Medium Risk</span>
-          <span><i style={{ background: "#ff5f1f" }} /> High Risk</span>
-          <span><i style={{ background: "#ff206e" }} /> Very High Risk</span>
+          <span><i style={{ background: "rgb(180, 35, 24)" }} /> Felony Density</span>
+          <span><i style={{ background: "rgb(247, 144, 9)" }} /> Misdemeanor Density</span>
+          <span><i style={{ background: "rgb(21, 112, 239)" }} /> Violation Density</span>
         </div>
         <div className="map-offense-legend">
           {Object.entries(OFFENSE_MARKERS).map(([key, marker]) => (

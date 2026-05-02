@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 260" role="img" aria-labelledby="title desc">
+  <title id="title">Night street evidence photo</title>
+  <desc id="desc">A gritty illustrated NYC street at night.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#17110d"/>
+      <stop offset="1" stop-color="#3b2618"/>
+    </linearGradient>
+    <filter id="grain">
+      <feTurbulence baseFrequency="0.9" numOctaves="2" seed="7" type="fractalNoise"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA slope="0.18" type="linear"/>
+      </feComponentTransfer>
+      <feBlend in2="SourceGraphic" mode="multiply"/>
+    </filter>
+  </defs>
+  <rect width="420" height="260" fill="url(#sky)"/>
+  <path d="M0 185h420v75H0z" fill="#0b0b09"/>
+  <path d="M172 260 220 132l48 128z" fill="#2d2118"/>
+  <path d="M198 260 220 132l23 128z" fill="#71532b" opacity=".58"/>
+  <g fill="#10100e">
+    <path d="M18 78h70v182H18z"/>
+    <path d="M330 55h62v205h-62z"/>
+    <path d="M104 100h44v160h-44z"/>
+    <path d="M278 95h36v165h-36z"/>
+  </g>
+  <g fill="#d89222" opacity=".8">
+    <rect x="34" y="98" width="9" height="12"/><rect x="62" y="124" width="9" height="12"/>
+    <rect x="344" y="84" width="9" height="12"/><rect x="371" y="116" width="9" height="12"/>
+    <rect x="116" y="123" width="8" height="10"/><rect x="289" y="118" width="8" height="10"/>
+  </g>
+  <circle cx="222" cy="133" r="18" fill="#ffdf7e" opacity=".78"/>
+  <circle cx="222" cy="133" r="42" fill="#ff206e" opacity=".16"/>
+  <path d="M0 207c58-17 124-21 199-12 62 8 135 4 221-23v88H0z" fill="#17110d" opacity=".8"/>
+  <path d="M180 260 224 152l44 108" fill="none" stroke="#f8edcf" stroke-dasharray="8 12" stroke-width="4" opacity=".72"/>
+  <rect x="0" y="0" width="420" height="260" fill="none" filter="url(#grain)"/>
+</svg>
