@@ -15,7 +15,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source", choices=["historic", "ytd"], default="historic")
     parser.add_argument("--start-date", required=True, help="Inclusive start date, YYYY-MM-DD.")
     parser.add_argument("--end-date", required=True, help="Exclusive end date, YYYY-MM-DD.")
-    parser.add_argument("--page-size", type=int, default=50_000)
+    parser.add_argument("--page-size", type=int, default=10_000)
     parser.add_argument("--max-pages", type=int, default=None)
     parser.add_argument("--upload-to-gcs", action="store_true")
     parser.add_argument("--load-to-bigquery", action="store_true")
