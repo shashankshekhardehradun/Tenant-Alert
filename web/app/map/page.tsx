@@ -30,6 +30,7 @@ export default async function MapPage() {
       <nav className="bulletin-nav">
         <Link className="nav-link" href="/graphs">Front Page</Link>
         <Link className="nav-link" href="/map">The Map Room</Link>
+        <Link className="nav-link" href="/risk">Risk Receipt</Link>
         <Link className="nav-link" href="/boroughs/manhattan">Borough Files</Link>
       </nav>
       <div className="ticker live-ticker">
