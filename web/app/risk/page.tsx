@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { LiveNewsTicker } from "../../components/LiveNewsTicker";
 import { RiskCalculator } from "../../components/RiskCalculator";
 
 export default function RiskPage() {
@@ -31,12 +32,11 @@ export default function RiskPage() {
         <Link className="nav-link" href="/risk">Risk Receipt</Link>
         <Link className="nav-link" href="/boroughs/manhattan">Borough Files</Link>
       </nav>
-      <div className="ticker live-ticker">
-        <span>Friend advice meets tabloid math</span>
-        <span>No protected traits used for scoring</span>
-        <span>Receipt printer warmed up</span>
-        <span>Friend advice meets tabloid math</span>
-      </div>
+      <LiveNewsTicker fallbackItems={[
+        "Friend advice meets tabloid math.",
+        "No protected traits used for scoring.",
+        "Receipt printer warmed up.",
+      ]} />
       <div className="content-stack">
         <RiskCalculator />
       </div>

@@ -174,20 +174,61 @@ select {
   border-bottom: 2px solid var(--ink);
   background: var(--crime-red);
   color: var(--paper-soft);
-  font-family: Impact, "Arial Narrow", sans-serif;
-  letter-spacing: 0.08em;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.035em;
   padding: 0.4rem 0.6rem;
+  text-rendering: geometricPrecision;
   text-transform: uppercase;
+  -webkit-font-smoothing: antialiased;
 }
 
 .live-ticker {
   white-space: nowrap;
 }
 
-.live-ticker span {
+.live-ticker > span {
   display: inline-block;
   padding-right: 4rem;
   animation: ticker-scroll 20s linear infinite;
+}
+
+.news-ticker {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  padding: 0;
+}
+
+.ticker-source {
+  flex: 0 0 auto;
+  background: var(--ink);
+  border-right: 2px solid var(--paper-soft);
+  color: var(--paper-soft);
+  padding: 0.45rem 0.65rem;
+}
+
+.ticker-track {
+  display: flex;
+  min-width: max-content;
+  animation: ticker-scroll 92s linear infinite;
+}
+
+.ticker-track a,
+.ticker-track span {
+  display: inline-block;
+  padding: 0.45rem 2.5rem 0.45rem 0;
+  text-decoration: none;
+}
+
+.ticker-track a::after,
+.ticker-track span::after {
+  content: " · ";
+  padding-left: 2.5rem;
+}
+
+.news-ticker:hover .ticker-track {
+  animation-play-state: paused;
 }
 
 @keyframes ticker-scroll {

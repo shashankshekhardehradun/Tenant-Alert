@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.app.routers import analytics, buildings, compare, complaints, crime, neighborhoods
+from api.app.routers import analytics, buildings, compare, complaints, crime, neighborhoods, news
 
 app = FastAPI(title="Tenant Alert API", version="0.1.0")
 
@@ -26,6 +26,7 @@ app.include_router(buildings.router, prefix="/buildings", tags=["buildings"])
 app.include_router(complaints.router, prefix="/complaints", tags=["complaints"])
 app.include_router(compare.router, prefix="/compare", tags=["compare"])
 app.include_router(crime.router, prefix="/crime", tags=["crime"])
+app.include_router(news.router, prefix="/news", tags=["news"])
 
 
 @app.get("/")
