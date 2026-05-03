@@ -222,3 +222,45 @@ News ticker freshness is request-time through FastAPI with a 10-minute in-memory
 6. In **APIs & Services** → **Credentials**, restrict the Maps browser key **HTTP referrers** to `https://app.yourdomain.com/*` (and localhost for dev if desired).
 
 If you prefer a single hostname and path-based routing, use an **External HTTP(S) load balancer** with serverless NEGs to both services; that is more setup than subdomain → Cloud Run.
+
+## 10. GitHub Actions continuous deploy (CD)
+
+Workflow **`.github/workflows/deploy.yml`** runs on **push to `main`** when relevant paths change (API, web, worker, dbt, Dockerfiles, etc.) and on **`workflow_dispatch`**. It authenticates with **Workload Identity Federation** (no long‑lived JSON keys in the repo), **builds and pushes** three images to Artifact Registry tagged **`${GITHUB_SHA}`** and **`latest`**, then runs **`gcloud run services update`** (API + web) and **`gcloud run jobs update`** (worker).
+
+**Bootstrap once:** Cloud Run services and the job must already exist (same names Terraform uses). Run **`terraform apply`** locally at least once before relying on GitHub CD.
+
+### 10.1 GitHub repository variables (Settings → Actions → Variables)
+
+| Variable | Example | Purpose |
+|----------|---------|---------|
+| `GCP_PROJECT_ID` | `tenant-alert-494522` | GCP project |
+| `GCP_REGION` | `us-east1` | Region for Artifact Registry + Cloud Run |
+| `TF_ENVIRONMENT` | `dev` | Suffix in service/job names (`tenant-alert-api-dev`, …) |
+| `NEXT_PUBLIC_API_URL` | `https://tenant-alert-api-dev-xxxxx.a.run.app` | Baked into the Next.js build at deploy time |
+| `NEXT_PUBLIC_GOOGLE_MAP_ID` | *(optional)* | Maps Map ID |
+| `NEXT_PUBLIC_USE_GOOGLE_MAP_ID` | `false` or `true` | Match local web build |
+
+### 10.2 GitHub Actions secrets
+
+| Secret | Purpose |
+|--------|---------|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Full provider resource name, e.g. `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider` |
+| `GCP_DEPLOY_SA_EMAIL` | Deployer service account email, e.g. `github-deployer@PROJECT_ID.iam.gserviceaccount.com` |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Browser Maps key (same value you use for local `docker build` of web) |
+
+### 10.3 GCP: deployer service account and IAM
+
+1. Create a service account (e.g. **`github-deployer`**) used only for CI.
+2. Grant it at least:
+   - **`roles/artifactregistry.writer`** on the Artifact Registry repo (or project),
+   - **`roles/run.admin`** (or narrower **`roles/run.developer`** plus **`roles/iam.serviceAccountUser`** on the **`tenant-alert-<env>`** workload SA if updates require impersonation),
+   - Permission to **update** the three resources: **`tenant-alert-api-<env>`**, **`tenant-alert-web-<env>`**, **`tenant-alert-daily-refresh-<env>`** (job).
+3. Follow Google’s guide **[Authenticate to Google Cloud from GitHub Actions](https://cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines)** to create a **Workload Identity Pool** + **OIDC provider** for GitHub, then **allow `principalSet` / attribute mapping** so only your repo (and optionally only `refs/heads/main`) can impersonate **`github-deployer`**. Put the provider’s full resource name into **`GCP_WORKLOAD_IDENTITY_PROVIDER`**.
+
+### 10.4 Terraform state vs CD
+
+CD updates **running images** in GCP; it does **not** run **`terraform apply`**. After many CD runs, a local **`terraform plan`** may show image digest drift until you either refresh state or run **`terraform apply`** with the same image URIs you care about. Infra changes (IAM, CORS env, new buckets) still go through **Terraform** locally or in a separate pipeline if you add one later.
+
+### 10.5 Manual redeploy
+
+In GitHub: **Actions → deploy → Run workflow** (`workflow_dispatch`) to rebuild and roll all three images without waiting for a path-filtered push.
