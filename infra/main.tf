@@ -1,5 +1,9 @@
 locals {
   datasets = ["bronze", "silver", "gold", "ml"]
+  cors_origins_for_api = concat(
+    var.cors_allow_origins,
+    [for x in split(",", var.cors_allow_origins_extra) : trimspace(x) if trimspace(x) != ""],
+  )
   service_env = {
     GCP_PROJECT_ID       = var.project_id
     ENVIRONMENT          = var.environment
@@ -16,7 +20,7 @@ locals {
     CENSUS_API_KEY       = var.census_api_key
   }
   api_container_env = merge(local.service_env, {
-    CORS_ALLOW_ORIGINS      = join(",", var.cors_allow_origins)
+    CORS_ALLOW_ORIGINS      = join(",", local.cors_origins_for_api)
     CORS_ALLOW_ORIGIN_REGEX = var.cors_allow_origin_regex
   })
 }
@@ -115,7 +119,7 @@ resource "google_cloud_run_v2_service" "api" {
   count               = var.api_image == "" ? 0 : 1
   name                = "tenant-alert-api-${var.environment}"
   location            = var.region
-  deletion_protection = false
+  deletion_protection = true
 
   template {
     service_account = google_service_account.workload_sa.email
@@ -153,7 +157,7 @@ resource "google_cloud_run_v2_service" "web" {
   count               = var.web_image == "" ? 0 : 1
   name                = "tenant-alert-web-${var.environment}"
   location            = var.region
-  deletion_protection = false
+  deletion_protection = true
 
   template {
     service_account = google_service_account.workload_sa.email
@@ -165,6 +169,12 @@ resource "google_cloud_run_v2_service" "web" {
         container_port = 8080
       }
     }
+  }
+
+  lifecycle {
+    # Omitting -var="web_image=..." used to plan count=0 and destroy this service (breaking
+    # custom domain mappings). Fail the plan instead of destroying the web service.
+    prevent_destroy = true
   }
 
   depends_on = [google_project_service.services]

@@ -48,7 +48,7 @@ variable "census_api_key" {
 }
 
 variable "cors_allow_origins" {
-  description = "Comma-joined list for FastAPI CORS (exact origins). Add https://your-domain after custom domain mapping."
+  description = "Base list of exact browser origins allowed to call the FastAPI CORS API. Prefer cors_allow_origins_extra from PowerShell CLI instead of overriding this list."
   type        = list(string)
   default = [
     "http://localhost:3000",
@@ -56,6 +56,12 @@ variable "cors_allow_origins" {
     "http://localhost:3001",
     "http://127.0.0.1:3001",
   ]
+}
+
+variable "cors_allow_origins_extra" {
+  description = "Comma-separated extra CORS origins (no brackets or JSON). Appended to cors_allow_origins. Example: https://nycroulette.net,https://www.nycroulette.net — avoids PowerShell/terraform -var list parsing issues."
+  type        = string
+  default     = ""
 }
 
 variable "cors_allow_origin_regex" {

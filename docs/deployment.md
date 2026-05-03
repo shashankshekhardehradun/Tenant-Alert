@@ -65,7 +65,7 @@ docker push $workerImage
 
 Terraform grants **public** `roles/run.invoker` to `allUsers` on the API and web services when `api_allow_unauthenticated` / `web_allow_unauthenticated` are true (defaults), so you do not need manual `gcloud run services add-iam-policy-binding` for a public portfolio deployment. Set them to `false` if your org blocks `allUsers` on Cloud Run.
 
-The API reads CORS from container env: **`CORS_ALLOW_ORIGINS`** (comma-separated exact origins) and optional **`CORS_ALLOW_ORIGIN_REGEX`** (defaults to matching `https://*.a.run.app` so the deployed Next.js URL can call the API without a second apply). Add your custom domain origins to `cors_allow_origins` after domain mapping (see §9).
+The API reads CORS from container env: **`CORS_ALLOW_ORIGINS`** (comma-separated exact origins) and optional **`CORS_ALLOW_ORIGIN_REGEX`** (defaults to matching `https://*.a.run.app` so the deployed Next.js URL can call the API without a second apply). After domain mapping, add your site with **`-var="cors_allow_origins_extra=https://your-domain"`** (see optional flags below) or §9.
 
 ```powershell
 cd D:\Tenant-Alert\infra
@@ -80,13 +80,23 @@ terraform apply `
   -var="census_api_key=$env:CENSUS_API_KEY"
 ```
 
-**Important:** After the **web** service exists, **every** `terraform apply` that manages this stack must pass **`-var="web_image=$webImage"`** (same image tag is fine). If you omit it, Terraform sets `web_image` to the default empty string and **plans to destroy the web Cloud Run service** (and your custom domain mapping can break). The repo sets **`deletion_protection = false`** on API/web so a mistaken apply does not hang forever on destroy—but you should still always pass all three image variables once deployed.
+**Important:** After the **web** service exists, **every** `terraform apply` that manages this stack must pass **`-var="web_image=$webImage"`** (same image tag is fine). If you omit it, Terraform would try to drop the web service (`count = 0`); the **`lifecycle { prevent_destroy = true }`** on the web Cloud Run service **fails the plan** instead of destroying it. The web service also uses **`deletion_protection = true`** (GCP) so accidental deletes are harder. You should still **always pass all three image variables** once deployed so state stays aligned. If a past apply removed **public IAM** on web or left the service missing, see **Troubleshooting** below.
+
+### Troubleshooting: custom domain / site not reachable
+
+1. **Cloud Run → `tenant-alert-web-<env>`** — confirm the service exists and the latest revision is healthy.
+2. **Security → Invokers** — for a public site, **`allUsers`** with **`Cloud Run Invoker`** should be present. If missing, re-run **`terraform apply`** with **`-var="web_image=$webImage"`** and **`web_allow_unauthenticated=true`** (default) so Terraform reapplies `google_cloud_run_v2_service_iam_member.web_public_invoker`.
+3. **Custom domains** — if the **web** service was deleted and recreated (new UID) or the mapping shows errors, open **Custom domains** for the service and ensure **`nycroulette.net`** (or your host) is still mapped; re-add DNS records if the console asks.
+4. **DNS (GoDaddy)** — records must still match what Google expects (often **CNAME** to `ghs.googlehosted.com` or the target shown in Cloud Run).
+5. **`terraform plan`** — ensure it is **not** trying to destroy the web service; always pass **`web_image`** when the web app should exist.
 
 Optional Terraform flags (defaults are usually enough):
 
-- `-var='cors_allow_origins=["http://localhost:3000","https://app.example.com"]'` — exact browser origins allowed to call the API.
+- **`-var="cors_allow_origins_extra=https://nycroulette.net"`** (recommended on **PowerShell**) — comma-separated **extra** origins appended to the default localhost list. No JSON or HCL list syntax, so you avoid **`Missing item separator`** errors from `-var='cors_allow_origins=[...]'` on Windows.
 - `-var='cors_allow_origin_regex='` — empty string disables the default `*.a.run.app` regex (stricter CORS).
 - `-var="api_allow_unauthenticated=false"` — keep the API private (then use authenticated clients or a load balancer / IAP).
+
+**Overriding the full `cors_allow_origins` list** (advanced): use a **`.tfvars`** file in `infra/` (e.g. `cors.auto.tfvars`, gitignored by `*.auto.tfvars`) with a multi-line HCL `list`, or set **`TF_VAR_cors_allow_origins`** to a **JSON** array (Terraform expects JSON for complex types from the environment), e.g. `$env:TF_VAR_cors_allow_origins='["http://localhost:3000","https://nycroulette.net"]'` then run `terraform apply` without `-var` for that variable.
 
 Capture the API URL:
 
@@ -207,7 +217,7 @@ News ticker freshness is request-time through FastAPI with a 10-minute in-memory
 1. **Verify** domain ownership (Google Search Console or the flow linked from Cloud Run).
 2. In **Cloud Run** → service **`tenant-alert-web-<environment>`** → **Custom domains** → add e.g. `app.yourdomain.com` → create the **DNS records** the wizard shows (often **CNAME** to a Google target).
 3. Repeat for **`tenant-alert-api-<environment>`** with e.g. `api.yourdomain.com` if you want a dedicated API hostname.
-4. Run **`terraform apply`** and pass **`cors_allow_origins`** including **`https://app.yourdomain.com`** so the API allows your real web origin (the default `*.a.run.app` regex does not match a custom hostname).
+4. Run **`terraform apply`** and pass **`-var="cors_allow_origins_extra=https://app.yourdomain.com"`** (and other `-var` image flags as usual) so the API allows your real web origin (the default `*.a.run.app` regex does not match a custom hostname).
 5. **Rebuild the web image** with `--build-arg NEXT_PUBLIC_API_URL=https://api.yourdomain.com` (or your chosen API URL), **push**, and **`terraform apply`** again with the new `web_image` (and rebuilt `api_image` if you changed only Terraform env for CORS—API image unchanged unless you changed Python).
 6. In **APIs & Services** → **Credentials**, restrict the Maps browser key **HTTP referrers** to `https://app.yourdomain.com/*` (and localhost for dev if desired).
 
