@@ -112,9 +112,10 @@ resource "google_project_iam_member" "secret_accessor" {
 }
 
 resource "google_cloud_run_v2_service" "api" {
-  count    = var.api_image == "" ? 0 : 1
-  name     = "tenant-alert-api-${var.environment}"
-  location = var.region
+  count               = var.api_image == "" ? 0 : 1
+  name                = "tenant-alert-api-${var.environment}"
+  location            = var.region
+  deletion_protection = false
 
   template {
     service_account = google_service_account.workload_sa.email
@@ -149,9 +150,10 @@ resource "google_cloud_run_v2_service_iam_member" "api_public_invoker" {
 }
 
 resource "google_cloud_run_v2_service" "web" {
-  count    = var.web_image == "" ? 0 : 1
-  name     = "tenant-alert-web-${var.environment}"
-  location = var.region
+  count               = var.web_image == "" ? 0 : 1
+  name                = "tenant-alert-web-${var.environment}"
+  location            = var.region
+  deletion_protection = false
 
   template {
     service_account = google_service_account.workload_sa.email
