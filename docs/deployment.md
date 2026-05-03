@@ -80,6 +80,8 @@ terraform apply `
   -var="census_api_key=$env:CENSUS_API_KEY"
 ```
 
+**Important:** After the **web** service exists, **every** `terraform apply` that manages this stack must pass **`-var="web_image=$webImage"`** (same image tag is fine). If you omit it, Terraform sets `web_image` to the default empty string and **plans to destroy the web Cloud Run service** (and your custom domain mapping can break). The repo sets **`deletion_protection = false`** on API/web so a mistaken apply does not hang forever on destroy—but you should still always pass all three image variables once deployed.
+
 Optional Terraform flags (defaults are usually enough):
 
 - `-var='cors_allow_origins=["http://localhost:3000","https://app.example.com"]'` — exact browser origins allowed to call the API.
