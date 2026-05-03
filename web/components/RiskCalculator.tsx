@@ -264,16 +264,6 @@ export function RiskCalculator() {
         <OptionGroup label="How chaotic are you feeling?" name="chaos" options={OPTIONS.chaos} value={form.chaos} onChange={updateField} />
         <button className="receipt-button" onClick={calculateRisk} type="button">Print My Fate</button>
         {status ? <p className="blotter-note">{status}</p> : null}
-        <div className="feature-map-card">
-          <h3>Actual Features vs UI Copy</h3>
-          {FEATURE_MAPPING.map(([ui, actual, output]) => (
-            <p key={ui}>
-              <strong>{ui}</strong>
-              <span>{actual}</span>
-              <em>{output}</em>
-            </p>
-          ))}
-        </div>
       </div>
 
       <aside className="receipt-stack">
