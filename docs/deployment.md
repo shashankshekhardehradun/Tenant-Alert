@@ -80,7 +80,15 @@ terraform apply `
   -var="census_api_key=$env:CENSUS_API_KEY"
 ```
 
-**Important:** After the **web** service exists, **every** `terraform apply` that manages this stack must pass **`-var="web_image=$webImage"`** (same image tag is fine). If you omit it, Terraform sets `web_image` to the default empty string and **plans to destroy the web Cloud Run service** (and your custom domain mapping can break). The repo sets **`deletion_protection = false`** on API/web so a mistaken apply does not hang forever on destroy—but you should still always pass all three image variables once deployed.
+**Important:** After the **web** service exists, **every** `terraform apply` that manages this stack must pass **`-var="web_image=$webImage"`** (same image tag is fine). If you omit it, Terraform would try to drop the web service (`count = 0`); the **`lifecycle { prevent_destroy = true }`** on the web Cloud Run service **fails the plan** instead of destroying it. The web service also uses **`deletion_protection = true`** (GCP) so accidental deletes are harder. You should still **always pass all three image variables** once deployed so state stays aligned. If a past apply removed **public IAM** on web or left the service missing, see **Troubleshooting** below.
+
+### Troubleshooting: custom domain / site not reachable
+
+1. **Cloud Run → `tenant-alert-web-<env>`** — confirm the service exists and the latest revision is healthy.
+2. **Security → Invokers** — for a public site, **`allUsers`** with **`Cloud Run Invoker`** should be present. If missing, re-run **`terraform apply`** with **`-var="web_image=$webImage"`** and **`web_allow_unauthenticated=true`** (default) so Terraform reapplies `google_cloud_run_v2_service_iam_member.web_public_invoker`.
+3. **Custom domains** — if the **web** service was deleted and recreated (new UID) or the mapping shows errors, open **Custom domains** for the service and ensure **`nycroulette.net`** (or your host) is still mapped; re-add DNS records if the console asks.
+4. **DNS (GoDaddy)** — records must still match what Google expects (often **CNAME** to `ghs.googlehosted.com` or the target shown in Cloud Run).
+5. **`terraform plan`** — ensure it is **not** trying to destroy the web service; always pass **`web_image`** when the web app should exist.
 
 Optional Terraform flags (defaults are usually enough):
 

@@ -115,7 +115,7 @@ resource "google_cloud_run_v2_service" "api" {
   count               = var.api_image == "" ? 0 : 1
   name                = "tenant-alert-api-${var.environment}"
   location            = var.region
-  deletion_protection = false
+  deletion_protection = true
 
   template {
     service_account = google_service_account.workload_sa.email
@@ -153,7 +153,7 @@ resource "google_cloud_run_v2_service" "web" {
   count               = var.web_image == "" ? 0 : 1
   name                = "tenant-alert-web-${var.environment}"
   location            = var.region
-  deletion_protection = false
+  deletion_protection = true
 
   template {
     service_account = google_service_account.workload_sa.email
@@ -165,6 +165,12 @@ resource "google_cloud_run_v2_service" "web" {
         container_port = 8080
       }
     }
+  }
+
+  lifecycle {
+    # Omitting -var="web_image=..." used to plan count=0 and destroy this service (breaking
+    # custom domain mappings). Fail the plan instead of destroying the web service.
+    prevent_destroy = true
   }
 
   depends_on = [google_project_service.services]
