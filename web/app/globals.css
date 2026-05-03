@@ -837,6 +837,27 @@ select {
   font-family: var(--font-typewriter), "Courier New", monospace;
   padding: 0.48rem 0.6rem;
   transform: rotate(-0.3deg);
+  text-align: left;
+}
+
+.risk-chip-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.risk-chip-label {
+  line-height: 1.2;
+}
+
+.risk-chip-hint {
+  font-family: var(--font-body), Georgia, "Times New Roman", serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  opacity: 0.88;
+  text-transform: none;
 }
 
 .risk-chip:nth-child(even) {

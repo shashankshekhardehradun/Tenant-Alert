@@ -30,7 +30,9 @@ def _cors_allow_origin_regex() -> str | None:
 def _cors_middleware_kwargs() -> dict[str, object]:
     out: dict[str, object] = {
         "allow_origins": _cors_allow_origins(),
-        "allow_credentials": True,
+        # Public JSON API: keep false so browsers accept cross-origin fetch from the Next
+        # site without cookie flows (allow_credentials=True often causes opaque CORS failures).
+        "allow_credentials": False,
         "allow_methods": ["*"],
         "allow_headers": ["*"],
     }

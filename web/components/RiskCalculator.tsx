@@ -30,79 +30,110 @@ type FormState = {
   chaos: string;
 };
 
+/** [value, label] or [value, label, hint] shown under the label on chips */
+type RiskOptionRow = readonly [string, string] | readonly [string, string, string];
+
 const OPTIONS = {
   location: [
     ["SOHO", "SoHo"],
-    ["Lower Manhattan", "Lower Manhattan"],
-    ["Lower East Side", "Lower East Side"],
-    ["Williamsburg", "Williamsburg"],
-    ["Bushwick", "Bushwick"],
-    ["Coney Island", "Coney Island"],
-    ["Midtown", "Midtown"],
-    ["Astoria", "Astoria"],
-    ["Flushing", "Flushing"],
-    ["Jamaica", "Jamaica"],
-    ["Bronx", "The Bronx"],
-    ["Fordham", "Fordham"],
-    ["Mott Haven", "Mott Haven"],
-    ["Staten Island", "Staten Island"],
+    ["LOWER-MANHATTAN", "Lower Manhattan"],
+    ["LOWER-EAST-SIDE", "Lower East Side"],
+    ["EAST-VILLAGE", "East Village"],
+    ["GREENWICH-VILLAGE", "Greenwich Village"],
+    ["CHELSEA", "Chelsea"],
+    ["MIDTOWN", "Midtown"],
+    ["UPPER-EAST-SIDE", "Upper East Side"],
+    ["UPPER-WEST-SIDE", "Upper West Side"],
+    ["HARLEM", "Harlem"],
+    ["WASHINGTON-HEIGHTS", "Washington Heights"],
+    ["WILLIAMSBURG", "Williamsburg"],
+    ["BUSHWICK", "Bushwick"],
+    ["BED-STUY", "Bed-Stuy"],
+    ["PARK-SLOPE", "Park Slope"],
+    ["SUNSET-PARK", "Sunset Park"],
+    ["CONEY-ISLAND", "Coney Island"],
+    ["RED-HOOK", "Red Hook"],
+    ["DUMBO", "DUMBO"],
+    ["ASTORIA", "Astoria"],
+    ["LONG-ISLAND-CITY", "Long Island City"],
+    ["FLUSHING", "Flushing"],
+    ["JACKSON-HEIGHTS", "Jackson Heights"],
+    ["ELMHURST", "Elmhurst"],
+    ["RIDGEWOOD", "Ridgewood"],
+    ["JAMAICA", "Jamaica"],
+    ["BRONX", "The Bronx"],
+    ["FORDHAM", "Fordham"],
+    ["MOTT-HAVEN", "Mott Haven"],
+    ["HIGHBRIDGE", "Highbridge"],
+    ["STATEN-ISLAND", "North Shore / St. George"],
+    ["TOTTENVILLE", "Tottenville"],
   ],
   time_range: [
-    ["sun-still-doing-its-job", "Sun's still doing its job"],
-    ["after-work-wander", "After work wander"],
-    ["late-night-decisions", "Late night decisions"],
-    ["you-should-probably-be-home", "You should probably be home"],
+    ["sun-still-doing-its-job", "Sun's still doing its job", "Broad daylight, lots of eyes"],
+    ["after-work-wander", "After work wander", "Rush + golden hour overlap"],
+    ["late-night-decisions", "Late night decisions", "Prime sketch-window hours"],
+    ["you-should-probably-be-home", "You should probably be home", "Bar-time / dead-quiet mix"],
   ],
   activity: [
-    ["just-walking", "Just walking"],
-    ["walking-texting", "Walking + texting (bold)"],
-    ["headphones-on", "Noise-canceling headphones ON"],
-    ["post-drinks-confidence", "Post-drinks confidence"],
-    ["lost-pretending", "Lost but pretending not to be"],
-    ["tourist-mode", "Tourist mode activated"],
-    ["rideshare-wait", "Waiting for rideshare"],
-    ["late-night-food-run", "Late-night food run"],
-    ["camera-out", "Camera out, full send"],
-    ["shopping-bags", "Shopping bags swinging"],
+    ["just-walking", "Just walking", "Head up, normal pace"],
+    ["walking-texting", "Walking + texting", "Screen down, world blurry"],
+    ["headphones-on", "Headphones ON", "Noise-cancel tunnel vision"],
+    ["post-drinks-confidence", "Post-drinks confidence", "Liquid courage, slower reflexes"],
+    ["lost-pretending", "Lost but faking it", "Stop-start, obvious tourist tells"],
+    ["tourist-mode", "Tourist mode", "Map out, camera half-out"],
+    ["rideshare-wait", "Waiting for rideshare", "Curb + headlights roulette"],
+    ["late-night-food-run", "Late-night food run", "Cash + grease + lines"],
+    ["camera-out", "Camera out, full send", "Obvious valuables"],
+    ["shopping-bags", "Shopping bags swinging", "Hands full, attention split"],
+    ["dog-walking", "Dog walking", "Leash + poop bag hands busy"],
+    ["commute-rush", "Commute crush hour", "Crowd shove, earbuds, tunnel vision"],
+    ["date-night-stroll", "Date night stroll", "Softer awareness, pair bubble"],
   ],
   awareness: [
-    ["head-on-swivel", "Head on a swivel"],
-    ["casually-alert", "Casually alert"],
-    ["vibing-not-observing", "Vibing, not observing"],
-    ["main-character-energy", "Main character energy"],
+    ["head-on-swivel", "Head on a swivel", "Checking reflections & exits"],
+    ["casually-alert", "Casually alert", "Default NYC scan"],
+    ["vibing-not-observing", "Vibing, not observing", "Playlist louder than the block"],
+    ["main-character-energy", "Main character energy", "Film yourself energy"],
+    ["wired-but-tired", "Wired but tired", "Caffeine jitters, slow focus"],
   ],
   appearance: [
-    ["corporate-clean", "Corporate clean"],
-    ["low-key-local", "Low-key local"],
-    ["standing-out", "Standing out a little"],
-    ["rob-me-outfit", "Rob me outfit"],
+    ["corporate-clean", "Corporate clean", "Blends with office crowd"],
+    ["low-key-local", "Low-key local", "Neighborhood camo"],
+    ["standing-out", "Standing out a little", "Bright colors / loud kicks"],
+    ["rob-me-outfit", "Flashy flex", "Chains / designer loud"],
+    ["tourist-lanyard", "Tourist tells", "Lanyard + backpack flags"],
   ],
   movement: [
-    ["subway-platform", "Subway platform"],
-    ["side-street", "Side street"],
-    ["busy-avenue", "Busy avenue"],
-    ["transit-hub", "Near transit hub"],
-    ["tourist-zone", "Tourist-heavy zone"],
+    ["subway-platform", "Subway platform", "Gap + edge + train suction"],
+    ["side-street", "Side street", "Fewer witnesses, darker"],
+    ["busy-avenue", "Busy avenue", "Lights + crowd buffer"],
+    ["transit-hub", "Transit hub", "Turnstiles + cops + chaos"],
+    ["tourist-zone", "Tourist-heavy zone", "Slow walkers + pickpocket candy"],
+    ["waterfront-walk", "Waterfront / pier", "Wind, dark water, fewer exits"],
+    ["park-cut-through", "Park cut-through", "Tree cover, uneven light"],
   ],
   environment: [
-    ["bright-busy", "Bright & busy"],
-    ["rainy-empty", "Rainy and empty"],
-    ["sketchy-quiet", "Kinda sketchy quiet"],
-    ["crowded-chaos", "Crowded chaos"],
+    ["bright-busy", "Bright & busy", "Street vendors + foot traffic"],
+    ["rainy-empty", "Rainy & empty", "Echo + hoods up"],
+    ["sketchy-quiet", "Sketchy quiet", "Too still, ears on"],
+    ["crowded-chaos", "Crowded chaos", "Bodies + bump pockets"],
+    ["construction-canyon", "Construction canyon", "Scaffolding + blind corners"],
   ],
   group_context: [
-    ["solo-mission", "Solo mission"],
-    ["with-a-friend", "With a friend"],
-    ["group-energy", "Group energy"],
-    ["lone-wolf-2am", "Lone wolf at 2AM"],
+    ["solo-mission", "Solo mission", "Out alone, normal hours / crowds still around"],
+    ["with-a-friend", "With a friend", "2–3 people, you can split attention"],
+    ["group-energy", "Group energy", "4+ people, safety-in-numbers vibe"],
+    ["lone-wolf-2am", "Lone wolf at 2AM", "Just you, very late, thin cover"],
+    ["pair-outing", "Pair out (2)", "Date / roommate — still a tiny crew"],
+    ["tour-squad", "Tour / party squad", "8+ rolling deep, loud, obvious"],
   ],
   chaos: [
-    ["responsible-citizen", "Responsible citizen"],
-    ["little-reckless", "A little reckless"],
-    ["bad-decisions-pending", "Bad decisions pending"],
-    ["lets-see-what-happens", "Let's see what happens"],
+    ["responsible-citizen", "Responsible citizen", "Hydrated, charged, heading home"],
+    ["little-reckless", "A little reckless", "One more stop energy"],
+    ["bad-decisions-pending", "Bad decisions pending", "No plan, just vibes"],
+    ["lets-see-what-happens", "Let's see what happens", "Chaos agent mode"],
   ],
-} as const;
+} as const satisfies Record<keyof FormState, readonly RiskOptionRow[]>;
 
 const INITIAL_FORM: FormState = {
   location: "SOHO",
@@ -116,20 +147,11 @@ const INITIAL_FORM: FormState = {
   chaos: "little-reckless",
 };
 
-const FEATURE_MAPPING = [
-  ["Location", "Neighborhood-to-borough lookup + latest feature row", "BQML baseline"],
-  ["Time Range", "Representative hour bucket", "BQML hour feature + night factor"],
-  ["Activity", "Behavior exposure modifier", "Behavior/vibe"],
-  ["Awareness", "Attention penalty/discount", "Behavior/vibe"],
-  ["Appearance", "Visibility signal weight", "Behavior/vibe"],
-  ["Movement", "Street/transit context modifier", "Density context"],
-  ["Environment", "Lighting/crowd/weather vibe weight", "Behavior/vibe"],
-  ["Solo vs Group", "Group safety/context modifier", "Behavior/vibe"],
-  ["Chaos Slider", "Recklessness modifier", "Behavior/vibe"],
-];
-
 function optionLabel(name: keyof typeof OPTIONS, value: string) {
-  return OPTIONS[name].find(([optionValue]) => optionValue === value)?.[1] ?? value;
+  const row = OPTIONS[name].find(([optionValue]) => optionValue === value) as RiskOptionRow | undefined;
+  if (!row) return value;
+  if (row.length > 2) return `${row[1]} — ${row[2]}`;
+  return row[1];
 }
 
 function OptionGroup({
@@ -141,7 +163,7 @@ function OptionGroup({
 }: {
   label: string;
   name: keyof FormState;
-  options: readonly (readonly [string, string])[];
+  options: readonly RiskOptionRow[];
   value: string;
   onChange: (name: keyof FormState, value: string) => void;
 }) {
@@ -149,16 +171,24 @@ function OptionGroup({
     <fieldset className="risk-fieldset">
       <legend>{label}</legend>
       <div className="risk-chip-grid">
-        {options.map(([optionValue, optionLabel]) => (
-          <button
-            className={value === optionValue ? "risk-chip active" : "risk-chip"}
-            key={optionValue}
-            onClick={() => onChange(name, optionValue)}
-            type="button"
-          >
-            {optionLabel}
-          </button>
-        ))}
+        {options.map((row) => {
+          const optionValue = row[0];
+          const primary = row[1];
+          const hint = row.length > 2 ? row[2] : null;
+          return (
+            <button
+              className={value === optionValue ? "risk-chip active" : "risk-chip"}
+              key={optionValue}
+              onClick={() => onChange(name, optionValue)}
+              type="button"
+            >
+              <span className="risk-chip-inner">
+                <span className="risk-chip-label">{primary}</span>
+                {hint ? <span className="risk-chip-hint">{hint}</span> : null}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </fieldset>
   );
@@ -173,7 +203,7 @@ export function RiskCalculator() {
     [result],
   );
   const selectedReceiptLines = [
-    ["LOCATION", form.location],
+    ["LOCATION", optionLabel("location", form.location)],
     ["TIME", optionLabel("time_range", form.time_range)],
     ["ACTIVITY", optionLabel("activity", form.activity)],
     ["AWARENESS", optionLabel("awareness", form.awareness)],
@@ -250,7 +280,10 @@ export function RiskCalculator() {
         <div className="bodega-receipt">
           <h2>NYC Crime Roulette</h2>
           <p className="receipt-rule">-----------------------</p>
-          <p>LOCATION: {result?.location.toUpperCase() ?? form.location.toUpperCase()}</p>
+          <p>
+            LOCATION:{" "}
+            {(result ? optionLabel("location", result.location) : optionLabel("location", form.location)).toUpperCase()}
+          </p>
           <p>AREA: {result?.borough ?? "PENDING"}</p>
           <p>TIME: {optionLabel("time_range", form.time_range).toUpperCase()}</p>
           <p className="receipt-rule">-----------------------</p>
