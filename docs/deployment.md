@@ -159,7 +159,16 @@ dbt run --select crime_risk_feature_importance predictions_crime_risk_latest
 
 ## 7. Verify services
 
+Set `apiUrl` from Terraform (from `infra/`, after the API exists). **Trim** avoids a stray newline breaking the host. The value must be **`https://…a.run.app`** (Cloud Run). If you accidentally use the **Artifact Registry** host (`…docker.pkg.dev`), `Invoke-RestMethod` will hit Google’s infrastructure and return an HTML **404** for `/healthz` — that is not your API.
+
 ```powershell
+cd D:\Tenant-Alert\infra
+$apiUrl = (terraform output -raw api_url).Trim()
+Write-Host "API base URL: $apiUrl"
+if ($apiUrl -notmatch '^https://.+\.a\.run\.app/?$') {
+  Write-Warning "Expected Cloud Run default URL shape; if you use a custom domain, this regex is only a sanity check."
+}
+
 Invoke-RestMethod "$apiUrl/healthz"
 Invoke-RestMethod "$apiUrl/news/ticker?limit=5"
 Invoke-RestMethod "$apiUrl/crime/data-range"
