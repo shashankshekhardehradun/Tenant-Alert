@@ -2,18 +2,32 @@
 
 from __future__ import annotations
 
+import html
+import re
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter
 
 router = APIRouter()
 
-GDELT_DOC_API = "https://api.gdeltproject.org/api/v2/doc/doc"
+# Google News topic RSS — no API key; works well from Cloud Run vs GDELT doc API.
+_GOOGLE_NEWS_RSS = (
+    "https://news.google.com/rss/search?"
+    + urlencode(
+        {
+            "q": "New York City (NYPD OR crime OR police OR subway OR shooting)",
+            "hl": "en-US",
+            "gl": "US",
+            "ceid": "US:en",
+        }
+    )
+)
 NY1_RSS_URL = "https://ny1.com/nyc/all-boroughs/rss"
 NYC_TERMS = ("nyc", "new york", "manhattan", "brooklyn", "queens", "bronx", "staten island")
 SAFETY_TERMS = (
@@ -28,6 +42,12 @@ SAFETY_TERMS = (
     "subway",
     "public safety",
 )
+_HTTP_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (compatible; NYCRouletteTicker/1.0; +https://nycroulette.net) "
+        "python-httpx"
+    ),
+}
 FALLBACK_HEADLINES = [
     {
         "title": "NYPD weekly complaint data refreshed for the latest citywide read",
@@ -53,6 +73,7 @@ class CacheEntry:
 
 
 _CACHE: CacheEntry | None = None
+_CACHE_TTL_SECONDS = 3600
 
 
 def _contains_any(value: str, terms: tuple[str, ...]) -> bool:
@@ -91,54 +112,56 @@ def _dedupe(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return unique
 
 
-def _fetch_gdelt(limit: int) -> list[dict[str, Any]]:
-    query = (
-        '(NYC OR "New York City" OR Manhattan OR Brooklyn OR Queens OR Bronx '
-        'OR "Staten Island") (crime OR NYPD OR police OR robbery OR theft OR assault OR subway)'
-    )
-    with httpx.Client(timeout=12) as client:
-        response = client.get(
-            GDELT_DOC_API,
-            params={
-                "query": query,
-                "mode": "artlist",
-                "format": "json",
-                "maxrecords": limit,
-                "sort": "hybridrel",
-            },
-        )
-        response.raise_for_status()
-        articles = response.json().get("articles", [])
+def _strip_xmlns_for_parse(xml_text: str) -> str:
+    """Default xmlns on <rss> breaks ET.findall('.//item') for some feeds."""
+    if 'xmlns="' not in xml_text[:600]:
+        return xml_text
+    return re.sub(r" xmlns=\"[^\"]+\"", "", xml_text, count=1)
 
+
+def _xml_item_nodes(xml_text: str, cap: int) -> list[ET.Element]:
+    root = ET.fromstring(_strip_xmlns_for_parse(xml_text))
+    return root.findall(".//item")[:cap]
+
+
+def _fetch_google_news_rss(limit: int) -> list[dict[str, Any]]:
+    """Headlines from Google News RSS — query is already NYC + public-safety scoped."""
+    with httpx.Client(timeout=18.0, headers=_HTTP_HEADERS) as client:
+        response = client.get(_GOOGLE_NEWS_RSS)
+        response.raise_for_status()
     items: list[dict[str, Any]] = []
-    for article in articles:
-        title = _clean_title(str(article.get("title") or ""))
-        if (
-            not title
-            or not _contains_any(title, NYC_TERMS)
-            or not _contains_any(title, SAFETY_TERMS)
-        ):
+    for node in _xml_item_nodes(response.text, limit * 2):
+        raw_title = html.unescape(node.findtext("title") or "")
+        title = _clean_title(raw_title)
+        if len(title) < 12:
             continue
+        published_at = None
+        pub_date = node.findtext("pubDate")
+        if pub_date:
+            try:
+                published_at = parsedate_to_datetime(pub_date).isoformat()
+            except (TypeError, ValueError):
+                published_at = pub_date
         items.append(
             {
                 "title": title,
-                "url": article.get("url"),
-                "source": article.get("sourcecountry") or article.get("domain") or "GDELT",
-                "published_at": article.get("seendate"),
+                "url": node.findtext("link"),
+                "source": "Google News",
+                "published_at": published_at,
                 "borough": _borough_for_text(title),
             }
         )
+        if len(items) >= limit:
+            break
     return items
 
 
 def _fetch_rss(limit: int) -> list[dict[str, Any]]:
-    with httpx.Client(timeout=12) as client:
+    with httpx.Client(timeout=18.0, headers=_HTTP_HEADERS) as client:
         response = client.get(NY1_RSS_URL)
         response.raise_for_status()
-        root = ET.fromstring(response.text)
-
     items: list[dict[str, Any]] = []
-    for node in root.findall("./channel/item"):
+    for node in _xml_item_nodes(response.text, limit * 2):
         title = _clean_title(node.findtext("title") or "")
         description = _clean_title(node.findtext("description") or "")
         haystack = f"{title} {description}"
@@ -171,7 +194,7 @@ def _fetch_rss(limit: int) -> list[dict[str, Any]]:
 
 @router.get("/ticker")
 def news_ticker(limit: int = 12) -> dict[str, object]:
-    """Return ticker-safe NYC public-safety headlines from GDELT with RSS/static fallback."""
+    """NYC public-safety headlines: Google News RSS, then NY1 RSS, then static fallback."""
     global _CACHE
     now = time.time()
     safe_limit = max(3, min(limit, 25))
@@ -179,16 +202,20 @@ def news_ticker(limit: int = 12) -> dict[str, object]:
         return _CACHE.payload
 
     source = "fallback"
+    items: list[dict[str, Any]] = []
     try:
-        items = _fetch_gdelt(safe_limit * 2)
-        source = "gdelt"
-    except (httpx.HTTPError, ValueError):
+        items = _fetch_google_news_rss(safe_limit * 2)
+        if items:
+            source = "google-news"
+    except (httpx.HTTPError, ET.ParseError, ValueError):
         items = []
 
     if len(items) < 3:
         try:
-            items.extend(_fetch_rss(safe_limit))
-            source = "gdelt+rss" if source == "gdelt" else "rss"
+            extra = _fetch_rss(safe_limit)
+            items.extend(extra)
+            if extra:
+                source = f"{source}+ny1" if source == "google-news" else "ny1"
         except (httpx.HTTPError, ET.ParseError):
             pass
 
@@ -198,5 +225,5 @@ def news_ticker(limit: int = 12) -> dict[str, object]:
         "items": items,
         "ticker_text": " · ".join(f"LATEST: {item['title']}" for item in items),
     }
-    _CACHE = CacheEntry(expires_at=now + 600, payload=payload)
+    _CACHE = CacheEntry(expires_at=now + _CACHE_TTL_SECONDS, payload=payload)
     return payload
