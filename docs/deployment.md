@@ -18,6 +18,8 @@ $env:REGION="us-east1"
 $env:ENVIRONMENT="dev"
 ```
 
+**PowerShell gotcha:** `$env:tenant-alert-494522` is **not** the project id. It is parsed as `$env:tenant` minus `alert-494522`, which corrupts `-var` values (you may see `project_id=-alert-494522`, `region=-east1`, empty `environment`, and `account_id` errors). Always use **underscore** names like `GCP_PROJECT_ID` above, or literals: `-var="project_id=tenant-alert-494522"`. For a hyphenated env var name you must use braces: `${env:MY-PROJECT-ID}`.
+
 Authenticate Docker to Artifact Registry:
 
 ```powershell
@@ -61,6 +63,10 @@ docker push $workerImage
 
 ## 3. Deploy API and worker job first
 
+Terraform grants **public** `roles/run.invoker` to `allUsers` on the API and web services when `api_allow_unauthenticated` / `web_allow_unauthenticated` are true (defaults), so you do not need manual `gcloud run services add-iam-policy-binding` for a public portfolio deployment. Set them to `false` if your org blocks `allUsers` on Cloud Run.
+
+The API reads CORS from container env: **`CORS_ALLOW_ORIGINS`** (comma-separated exact origins) and optional **`CORS_ALLOW_ORIGIN_REGEX`** (defaults to matching `https://*.a.run.app` so the deployed Next.js URL can call the API without a second apply). Add your custom domain origins to `cors_allow_origins` after domain mapping (see §9).
+
 ```powershell
 cd D:\Tenant-Alert\infra
 
@@ -73,6 +79,12 @@ terraform apply `
   -var="soda_app_token=$env:SODA_APP_TOKEN" `
   -var="census_api_key=$env:CENSUS_API_KEY"
 ```
+
+Optional Terraform flags (defaults are usually enough):
+
+- `-var='cors_allow_origins=["http://localhost:3000","https://app.example.com"]'` — exact browser origins allowed to call the API.
+- `-var='cors_allow_origin_regex='` — empty string disables the default `*.a.run.app` regex (stricter CORS).
+- `-var="api_allow_unauthenticated=false"` — keep the API private (then use authenticated clients or a load balancer / IAP).
 
 Capture the API URL:
 
@@ -114,6 +126,8 @@ terraform apply `
   -var="soda_app_token=$env:SODA_APP_TOKEN" `
   -var="census_api_key=$env:CENSUS_API_KEY"
 ```
+
+Pass the same optional CORS / auth flags as in §3 whenever you need to change them.
 
 Get the public web URL:
 
@@ -174,3 +188,14 @@ The job:
 7. Refreshes feature importance and latest predictions.
 
 News ticker freshness is request-time through FastAPI with a 10-minute in-memory cache.
+
+## 9. Custom domain (GCP)
+
+1. **Verify** domain ownership (Google Search Console or the flow linked from Cloud Run).
+2. In **Cloud Run** → service **`tenant-alert-web-<environment>`** → **Custom domains** → add e.g. `app.yourdomain.com` → create the **DNS records** the wizard shows (often **CNAME** to a Google target).
+3. Repeat for **`tenant-alert-api-<environment>`** with e.g. `api.yourdomain.com` if you want a dedicated API hostname.
+4. Run **`terraform apply`** and pass **`cors_allow_origins`** including **`https://app.yourdomain.com`** so the API allows your real web origin (the default `*.a.run.app` regex does not match a custom hostname).
+5. **Rebuild the web image** with `--build-arg NEXT_PUBLIC_API_URL=https://api.yourdomain.com` (or your chosen API URL), **push**, and **`terraform apply`** again with the new `web_image` (and rebuilt `api_image` if you changed only Terraform env for CORS—API image unchanged unless you changed Python).
+6. In **APIs & Services** → **Credentials**, restrict the Maps browser key **HTTP referrers** to `https://app.yourdomain.com/*` (and localhost for dev if desired).
+
+If you prefer a single hostname and path-based routing, use an **External HTTP(S) load balancer** with serverless NEGs to both services; that is more setup than subdomain → Cloud Run.

@@ -7,6 +7,7 @@ tenant_alert:
       project: "{{ env_var('GCP_PROJECT_ID') }}"
       dataset: bronze
       threads: 4
-      timeout_seconds: 300
+      # BQML CREATE MODEL (e.g. Random Forest) often exceeds 5 minutes; dbt cancels the client wait at this cap.
+      timeout_seconds: 7200
       location: US
       priority: interactive

@@ -15,6 +15,10 @@ locals {
     SODA_APP_TOKEN       = var.soda_app_token
     CENSUS_API_KEY       = var.census_api_key
   }
+  api_container_env = merge(local.service_env, {
+    CORS_ALLOW_ORIGINS      = join(",", var.cors_allow_origins)
+    CORS_ALLOW_ORIGIN_REGEX = var.cors_allow_origin_regex
+  })
 }
 
 resource "google_project_service" "services" {
@@ -123,7 +127,7 @@ resource "google_cloud_run_v2_service" "api" {
       }
 
       dynamic "env" {
-        for_each = local.service_env
+        for_each = local.api_container_env
         content {
           name  = env.key
           value = env.value
@@ -133,6 +137,15 @@ resource "google_cloud_run_v2_service" "api" {
   }
 
   depends_on = [google_project_service.services]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "api_public_invoker" {
+  count    = var.api_image != "" && var.api_allow_unauthenticated ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.api[0].name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
 }
 
 resource "google_cloud_run_v2_service" "web" {
@@ -153,6 +166,15 @@ resource "google_cloud_run_v2_service" "web" {
   }
 
   depends_on = [google_project_service.services]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "web_public_invoker" {
+  count    = var.web_image != "" && var.web_allow_unauthenticated ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.web[0].name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
 }
 
 resource "google_cloud_run_v2_job" "daily_refresh" {
