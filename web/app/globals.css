@@ -20,11 +20,14 @@
 
 html {
   background: var(--charcoal);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(circle at 16% 10%, rgba(179, 49, 36, 0.16), transparent 26rem),
     radial-gradient(circle at 90% 2%, rgba(216, 146, 34, 0.14), transparent 22rem),
@@ -1456,5 +1459,173 @@ select {
 
   .receipt-stack {
     position: static;
+  }
+
+  .bulletin-shell {
+    width: min(1240px, calc(100% - 1.25rem));
+    margin: 0.85rem auto 2rem;
+    padding: clamp(0.65rem, 2.5vw, 1.1rem);
+  }
+
+  .bulletin-topline {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.45rem;
+    text-align: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .bulletin-shell {
+    width: calc(100% - max(1rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px)));
+    margin: 0.5rem auto 1.75rem;
+    padding: max(0.55rem, env(safe-area-inset-left, 0px)) max(0.55rem, env(safe-area-inset-right, 0px)) 0.65rem;
+    border-width: 3px;
+  }
+
+  .bulletin-topline {
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+  }
+
+  .bulletin-topline span {
+    flex: 1 1 100%;
+  }
+
+  .masthead-deck {
+    font-size: 0.92rem;
+  }
+
+  .price-box {
+    min-width: unset;
+    width: 100%;
+    max-width: 14rem;
+    margin-inline: auto;
+  }
+
+  .bulletin-nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.5rem 0.35rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    text-align: center;
+  }
+
+  .news-ticker {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .news-ticker .ticker-source {
+    border-right: 0;
+    border-bottom: 2px solid var(--paper-soft);
+    text-align: center;
+    padding: 0.4rem 0.5rem;
+  }
+
+  .news-ticker .ticker-track {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    animation: none;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 0.2rem;
+    padding: 0.35rem 0.45rem 0.5rem;
+  }
+
+  .ticker-track a,
+  .ticker-track span {
+    white-space: normal;
+    max-width: 100%;
+    padding: 0.3rem 0.65rem 0.3rem 0;
+    font-size: 0.72rem;
+    line-height: 1.25;
+  }
+
+  .risk-chip-grid {
+    gap: 0.35rem;
+  }
+
+  .risk-chip {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-height: 44px;
+    transform: none;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .risk-chip:nth-child(even) {
+    transform: none;
+  }
+
+  .risk-form-card h2 {
+    font-size: clamp(1.65rem, 9vw, 2.6rem);
+  }
+
+  .bodega-receipt blockquote {
+    font-size: clamp(1.1rem, 5.5vw, 1.75rem);
+  }
+
+  .receipt-row {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .receipt-row span {
+    white-space: normal;
+    flex: 1 1 100%;
+  }
+
+  .receipt-row strong {
+    max-width: 100%;
+    text-align: left;
+  }
+
+  .paper-card:nth-of-type(odd),
+  .paper-card:nth-of-type(even) {
+    transform: none;
+  }
+
+  .lens-card:nth-child(odd),
+  .lens-card:nth-child(even) {
+    transform: none;
+  }
+
+  .plotly-chart-host {
+    height: min(52vh, 420px) !important;
+    min-height: 260px;
+  }
+
+  .offense-chart-inner {
+    min-width: 268px;
+  }
+
+  .hourly-density-scroller {
+    margin: 0 -0.15rem;
+    padding: 0 0.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track,
+  .live-ticker > span {
+    animation: none !important;
+  }
+
+  .news-ticker .ticker-track {
+    overflow-x: auto;
   }
 }

@@ -10,6 +10,13 @@ export const metadata = {
   description: "A gritty NYC crime analytics bulletin",
 };
 
+/** Mobile layout: correct initial scale + safe-area for notched devices */
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: {

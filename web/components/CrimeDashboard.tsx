@@ -323,8 +323,8 @@ function HourlyDensityPlot({ rows }: { rows: HourlyDensityRow[] }) {
       <p style={{ margin: "0 0 1rem", color: "#475467" }}>
         Darker cells show the time blocks where reported events concentrate.
       </p>
-      <div style={{ overflowX: "auto" }}>
-        <div style={{ minWidth: 760 }}>
+      <div className="hourly-density-scroller" style={{ overflowX: "auto" }}>
+        <div className="hourly-density-grid" style={{ minWidth: 760 }}>
           <div style={{ display: "grid", gridTemplateColumns: "52px repeat(24, 1fr)", gap: 3, marginBottom: 4 }}>
             <span />
             {Array.from({ length: 24 }, (_, hour) => (
@@ -600,7 +600,7 @@ function RotatableRiskSpace({ rows }: { rows: DemographicBoroughRow[] }) {
         z = median household income, and color/size = observed crime rate per 100k residents.
       </p>
       {status ? <p style={{ color: "#475467", margin: 0 }}>{status}</p> : null}
-      <div ref={containerRef} style={{ height: 520, width: "100%" }} />
+      <div ref={containerRef} className="plotly-chart-host" style={{ height: 520, width: "100%" }} />
     </section>
   );
 }
@@ -908,21 +908,23 @@ export function CrimeDashboard(props: {
         <div>
         <span className="section-label">What's Hot</span>
         <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Top reported offenses</h3>
-        <div className="chart-window" style={{ height: 360 }}>
-          <ResponsiveContainer>
+        <div className="chart-window offense-chart-wrap" style={{ height: 360 }}>
+          <div className="offense-chart-inner">
+            <ResponsiveContainer width="100%" height="100%">
             <BarChart
               layout="vertical"
               data={offenseData}
-              margin={{ top: 10, right: 20, left: 10, bottom: 0 }}
+              margin={{ top: 10, right: 16, left: 8, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#cdb98b" />
-              <XAxis type="number" />
-              <YAxis type="category" dataKey="offense" width={220} tick={{ fontSize: 11 }} />
+              <XAxis type="number" tick={{ fontSize: 10 }} />
+              <YAxis type="category" dataKey="offense" interval={0} tick={{ fontSize: 10 }} width={200} />
               <Tooltip />
               <Legend />
               <Bar dataKey="crimes" name="Reported events" fill="#1f5f8b" radius={[0, 6, 6, 0]} />
             </BarChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+          </div>
         </div>
         </div>
         <aside className="feature-copy">
