@@ -181,7 +181,7 @@ def _factor(label: str, points: int, detail: str) -> dict[str, object]:
 
 @router.post("/risk-score")
 def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
-    """BQML Random Forest baseline plus transparent modifiers for contextual risk."""
+    """Score contextual risk with a BQML Random Forest baseline plus transparent behavior modifiers."""
     borough = _borough_for_location(payload.location)
     hour = _hour_for_time_range(payload.time_range)
     sql = f"""
@@ -250,9 +250,7 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
           prediction.bachelors_or_higher_share,
           prediction.approx_median_household_income,
           prediction.approx_median_gross_rent,
-          array_agg(
-            struct(top_offenses.offense_description, top_offenses.crime_count)
-          ) as top_offenses
+          array_agg(struct(top_offenses.offense_description, top_offenses.crime_count)) as top_offenses
         from prediction
         left join top_offenses on true
         group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
@@ -267,11 +265,7 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
     if not rows:
         raise HTTPException(
             status_code=503,
-            detail=(
-                "BQML risk model is not available yet. Run dbt for "
-                "features_crime_risk_hourly, train_crime_risk_rf_model, "
-                "and crime_risk_feature_importance."
-            ),
+            detail="BQML risk model is not available yet. Run dbt for features_crime_risk_hourly, train_crime_risk_rf_model, and crime_risk_feature_importance.",
         )
     stats = rows[0] if rows else {}
     predicted_pressure = float(stats.get("predicted_crime_pressure_score") or 0)
@@ -284,9 +278,7 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
         night_factor += 20
     elif payload.time_range == "after-work-wander":
         night_factor += 7
-    crowd_density = min(18, round(predicted_pressure * 2)) + _model_weight(
-        "movement", payload.movement
-    )
+    crowd_density = min(18, round(predicted_pressure * 2)) + _model_weight("movement", payload.movement)
     recent_factor = min(15, recent_14d_incidents // 450)
     behavior_factor = (
         _model_weight("activity", payload.activity)
@@ -307,24 +299,13 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
             limit 5
         """
     )
-    baseline_detail = (
-        f"Random Forest predicted {predicted_pressure:.1f} "
-        f"severity-weighted incidents for {borough} around {hour}:00."
-    )
-    recent_detail = (
-        f"{recent_14d_incidents:,} borough incidents in the latest 14-day feature window."
-    )
-    density_detail = "Predicted area/hour pressure plus movement context."
-    behavior_detail = (
-        "Activity, awareness, appearance, group, environment, and chaos inputs."
-    )
     top_factors = sorted(
         [
-            _factor("BQML baseline", model_baseline, baseline_detail),
+            _factor("BQML baseline", model_baseline, f"Random Forest predicted {predicted_pressure:.1f} severity-weighted incidents for {borough} around {hour}:00."),
             _factor("Night factor", night_factor, f"Time range resolved near {hour}:00."),
-            _factor("Density context", crowd_density, density_detail),
-            _factor("Recent incidents", recent_factor, recent_detail),
-            _factor("Behavior/vibe", behavior_factor, behavior_detail),
+            _factor("Density context", crowd_density, "Predicted area/hour pressure plus movement context."),
+            _factor("Recent incidents", recent_factor, f"{recent_14d_incidents:,} borough incidents in the latest 14-day feature window."),
+            _factor("Behavior/vibe", behavior_factor, "Activity, awareness, appearance, group, environment, and chaos inputs."),
         ],
         key=lambda item: abs(int(item["points"])),
         reverse=True,
@@ -365,10 +346,7 @@ def crime_overview(
     end_date: Annotated[date, Query(..., description="Inclusive end date.")],
     top_n: Annotated[int, Query(ge=1, le=25)] = 10,
     map_limit: Annotated[int, Query(ge=1, le=5000)] = 1500,
-    borough: Annotated[
-        str | None,
-        Query(description="Optional uppercase NYC borough filter."),
-    ] = None,
+    borough: Annotated[str | None, Query(description="Optional uppercase NYC borough filter.")] = None,
 ) -> dict[str, object]:
     if start_date > end_date:
         raise HTTPException(status_code=400, detail="start_date must be on or before end_date")

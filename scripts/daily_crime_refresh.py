@@ -84,11 +84,7 @@ def run_dbt_models() -> None:
 def main() -> None:
     args = parse_args()
     today = dt.datetime.now(dt.UTC).date()
-    start_date = (
-        dt.date.fromisoformat(args.start_date)
-        if args.start_date
-        else today - dt.timedelta(days=1)
-    )
+    start_date = dt.date.fromisoformat(args.start_date) if args.start_date else today - dt.timedelta(days=1)
     end_date = dt.date.fromisoformat(args.end_date) if args.end_date else today
 
     if not args.skip_ingestion:

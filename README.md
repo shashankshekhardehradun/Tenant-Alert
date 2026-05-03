@@ -94,9 +94,7 @@ See `docs/bigquery_tables.md` for the broader table inventory and starter EDA qu
 
 ## Deploy to GCP
 
-Use `docs/deployment.md` for the production runbook. **Continuous deploy from `main`:** configure GitHub Actions per **`docs/deployment.md` §10** (`.github/workflows/deploy.yml`).
-
-The current deployment path uses:
+Use `docs/deployment.md` for the production runbook. The current deployment path uses:
 
 - Cloud Run service for FastAPI.
 - Cloud Run service for Next.js.
