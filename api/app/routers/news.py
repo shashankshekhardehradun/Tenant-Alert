@@ -92,7 +92,10 @@ def _dedupe(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _fetch_gdelt(limit: int) -> list[dict[str, Any]]:
-    query = '(NYC OR "New York City" OR Manhattan OR Brooklyn OR Queens OR Bronx OR "Staten Island") (crime OR NYPD OR police OR robbery OR theft OR assault OR subway)'
+    query = (
+        '(NYC OR "New York City" OR Manhattan OR Brooklyn OR Queens OR Bronx '
+        'OR "Staten Island") (crime OR NYPD OR police OR robbery OR theft OR assault OR subway)'
+    )
     with httpx.Client(timeout=12) as client:
         response = client.get(
             GDELT_DOC_API,
@@ -110,7 +113,11 @@ def _fetch_gdelt(limit: int) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for article in articles:
         title = _clean_title(str(article.get("title") or ""))
-        if not title or not _contains_any(title, NYC_TERMS) or not _contains_any(title, SAFETY_TERMS):
+        if (
+            not title
+            or not _contains_any(title, NYC_TERMS)
+            or not _contains_any(title, SAFETY_TERMS)
+        ):
             continue
         items.append(
             {
@@ -135,7 +142,11 @@ def _fetch_rss(limit: int) -> list[dict[str, Any]]:
         title = _clean_title(node.findtext("title") or "")
         description = _clean_title(node.findtext("description") or "")
         haystack = f"{title} {description}"
-        if not title or not _contains_any(haystack, NYC_TERMS) or not _contains_any(haystack, SAFETY_TERMS):
+        if (
+            not title
+            or not _contains_any(haystack, NYC_TERMS)
+            or not _contains_any(haystack, SAFETY_TERMS)
+        ):
             continue
         published_at = None
         pub_date = node.findtext("pubDate")
