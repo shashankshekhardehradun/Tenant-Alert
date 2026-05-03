@@ -15,13 +15,23 @@ output "artifact_registry_repository" {
 }
 
 output "api_url" {
-  description = "Public HTTPS URL for the FastAPI Cloud Run service (must look like https://....a.run.app — not Artifact Registry)."
-  value       = try(trimspace(google_cloud_run_v2_service.api[0].uri), "")
+  description = "Primary HTTPS URL (status.uri) for the FastAPI Cloud Run service."
+  value       = length(google_cloud_run_v2_service.api) > 0 ? trimspace(google_cloud_run_v2_service.api[0].uri) : ""
+}
+
+output "api_urls" {
+  description = "All HTTPS URLs Cloud Run publishes for the API service. If /healthz returns a Google HTML 404 on api_url, try the other entry (often *.<project-number>.<region>.run.app)."
+  value       = length(google_cloud_run_v2_service.api) > 0 ? google_cloud_run_v2_service.api[0].urls : []
 }
 
 output "web_url" {
-  description = "Public HTTPS URL for the Next.js Cloud Run service."
-  value       = try(trimspace(google_cloud_run_v2_service.web[0].uri), "")
+  description = "Primary HTTPS URL (status.uri) for the Next.js Cloud Run service."
+  value       = length(google_cloud_run_v2_service.web) > 0 ? trimspace(google_cloud_run_v2_service.web[0].uri) : ""
+}
+
+output "web_urls" {
+  description = "All HTTPS URLs Cloud Run publishes for the web service."
+  value       = length(google_cloud_run_v2_service.web) > 0 ? google_cloud_run_v2_service.web[0].urls : []
 }
 
 output "daily_refresh_job" {

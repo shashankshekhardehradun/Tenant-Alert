@@ -186,6 +186,15 @@ Invoke-RestMethod "$apiUrl/news/ticker?limit=5"
 Invoke-RestMethod "$apiUrl/crime/data-range"
 ```
 
+If **`Invoke-RestMethod "$apiUrl/healthz"`** returns **Google’s HTML 404** (robot / “That’s an error”) even though `api_url` looks like `https://tenant-alert-api-….a.run.app`, Cloud Run may still be fine — try **every URL** from **`terraform output -json api_urls`** (two formats are common: `….a.run.app` and `….PROJECT_NUMBER.REGION.run.app`). Example:
+
+```powershell
+terraform output -json api_urls
+# Then Invoke-RestMethod "<each-https-url>/healthz"
+```
+
+Also open **`$apiUrl/docs`** in a browser. If **`/docs`** works but PowerShell still fails, check **TLS / proxy** (try **`curl.exe -sS "$apiUrl/healthz"`**). In **Cloud Run → API service → Logs**, confirm requests hit the revision when you curl.
+
 Manually trigger the scheduled refresh job:
 
 ```powershell
