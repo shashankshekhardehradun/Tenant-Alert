@@ -181,11 +181,12 @@ def crime_data_range() -> dict[str, object]:
 
 
 def _risk_bucket(score: int) -> tuple[str, str, str]:
-    if score < 35:
+    """Verdict bands on the 1–99 receipt score (same scale as the UI total)."""
+    if score < 38:
         return ("LOW", "You're chilling", "Daytime Bubble")
-    if score < 60:
+    if score < 62:
         return ("MEDIUM", "Keep your head up", "Busy but Watchful")
-    if score < 80:
+    if score < 82:
         return ("HIGH", "Eyes up. Phone down.", "Classic NYC Chaos")
     return ("VERY HIGH", "Respectfully... go home", "Late Night Gamble Zone")
 
@@ -306,18 +307,20 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
     stats = rows[0] if rows else {}
     predicted_pressure = float(stats.get("predicted_crime_pressure_score") or 0)
     recent_14d_incidents = int(stats.get("recent_14d_incidents") or 0)
-    model_baseline = max(1, min(70, round(predicted_pressure * 8)))
-    night_factor = max(0, _model_weight("activity", payload.activity) // 3)
+    # RF row is borough+hour; cap baseline so behavior inputs can still swing the receipt.
+    model_baseline = max(1, min(52, round(predicted_pressure * 5.5)))
+    night_factor = max(0, _model_weight("activity", payload.activity) // 4)
+    # Time-bucket flat adds stay small — hour is already baked into the BQML feature row.
     if payload.time_range == "late-night-decisions":
-        night_factor += 14
+        night_factor += 9
     elif payload.time_range == "you-should-probably-be-home":
-        night_factor += 20
+        night_factor += 13
     elif payload.time_range == "after-work-wander":
-        night_factor += 7
-    crowd_density = min(18, round(predicted_pressure * 2)) + _model_weight(
+        night_factor += 5
+    crowd_density = min(12, round(predicted_pressure * 1.4)) + _model_weight(
         "movement", payload.movement
     )
-    recent_factor = min(15, recent_14d_incidents // 450)
+    recent_factor = min(8, recent_14d_incidents // 550)
     behavior_factor = (
         _model_weight("activity", payload.activity)
         + _model_weight("awareness", payload.awareness)
