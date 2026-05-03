@@ -30,6 +30,20 @@ gcloud auth configure-docker "$env:REGION-docker.pkg.dev"
 
 This creates buckets, BigQuery datasets, service account, Artifact Registry, and required APIs.
 
+**Critical:** In `infra/main.tf`, Cloud Run **API**, **web**, **worker job**, and **scheduler** only exist when `api_image`, `web_image`, and `worker_image` are **non-empty**. If you run `terraform apply` with **only** `project_id` / `region` / `environment`, those variables default to `""`, Terraform sets `count = 0`, and the plan **destroys** those services. That is correct for a **brand-new empty state** (no Cloud Run in state yet) and **wrong** once you have ever deployed the stack.
+
+- **First deploy ever (no `google_cloud_run_*` in state):** the apply block below is OK.
+- **Any later run, or if unsure:** do **not** use this minimal apply. Use **§3** (or any apply) with **all three** `-var="api_image=..."`, `-var="web_image=..."`, `-var="worker_image=..."` set to real Artifact Registry URLs (same `:latest` tags are fine).
+
+To see whether Cloud Run is already in state:
+
+```powershell
+cd D:\Tenant-Alert\infra
+terraform state list | Select-String "google_cloud_run"
+```
+
+If that prints services/jobs, **skip** the minimal apply below and go to **§2–§3** (build images if needed, then apply with all image vars).
+
 ```powershell
 cd D:\Tenant-Alert\infra
 
