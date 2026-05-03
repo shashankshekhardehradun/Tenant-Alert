@@ -182,6 +182,8 @@ gcloud run jobs execute "tenant-alert-daily-refresh-$env:ENVIRONMENT" `
   --wait
 ```
 
+If the job fails immediately with **exit code 1**, open **Cloud Run → job execution → Logs**. A common failure was the worker importing `ingestion` while `sys.path` only contained `scripts/`; that is fixed in `scripts/daily_crime_refresh.py` and `Dockerfile.worker` (`PYTHONPATH=/app`). **Rebuild and push the worker image**, then `terraform apply` with the new `worker_image` tag.
+
 ## 8. Ongoing freshness
 
 Cloud Scheduler runs the Cloud Run job every day at 7:00 AM America/New_York.
