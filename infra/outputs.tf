@@ -15,11 +15,13 @@ output "artifact_registry_repository" {
 }
 
 output "api_url" {
-  value = try(google_cloud_run_v2_service.api[0].uri, "")
+  description = "Public HTTPS URL for the FastAPI Cloud Run service (must look like https://....a.run.app — not Artifact Registry)."
+  value       = try(trimspace(google_cloud_run_v2_service.api[0].uri), "")
 }
 
 output "web_url" {
-  value = try(google_cloud_run_v2_service.web[0].uri, "")
+  description = "Public HTTPS URL for the Next.js Cloud Run service."
+  value       = try(trimspace(google_cloud_run_v2_service.web[0].uri), "")
 }
 
 output "daily_refresh_job" {

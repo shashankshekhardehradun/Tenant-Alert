@@ -5,10 +5,19 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import subprocess
+import sys
+import traceback
 from pathlib import Path
 
-from ingestion.crime.nypd_complaints import run_nypd_complaints_etl
-from tenant_alert.config import settings
+# Running as `python scripts/daily_crime_refresh.py` puts `scripts/` on sys.path first, so
+# `import ingestion` fails unless the repo root (parent of `scripts/`) is on the path.
+# Cloud Run Job uses this entrypoint; without this fix the container exits immediately with code 1.
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from ingestion.crime.nypd_complaints import run_nypd_complaints_etl  # noqa: E402
+from tenant_alert.config import settings  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,6 +77,7 @@ def run_dbt_models() -> None:
         ],
     ]
     for command in commands:
+        print(f"running: {' '.join(command)}", flush=True)
         subprocess.run(command, check=True)
 
 
@@ -97,4 +107,12 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except subprocess.CalledProcessError as exc:
+        print(f"subprocess failed (exit {exc.returncode}): {exc.cmd}", flush=True)
+        traceback.print_exc()
+        raise SystemExit(exc.returncode) from exc
+    except Exception:
+        traceback.print_exc()
+        raise SystemExit(1) from None

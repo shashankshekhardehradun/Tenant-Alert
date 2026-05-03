@@ -159,7 +159,16 @@ dbt run --select crime_risk_feature_importance predictions_crime_risk_latest
 
 ## 7. Verify services
 
+Set `apiUrl` from Terraform (from `infra/`, after the API exists). **Trim** avoids a stray newline breaking the host. The value must be **`https://…a.run.app`** (Cloud Run). If you accidentally use the **Artifact Registry** host (`…docker.pkg.dev`), `Invoke-RestMethod` will hit Google’s infrastructure and return an HTML **404** for `/healthz` — that is not your API.
+
 ```powershell
+cd D:\Tenant-Alert\infra
+$apiUrl = (terraform output -raw api_url).Trim()
+Write-Host "API base URL: $apiUrl"
+if ($apiUrl -notmatch '^https://.+\.a\.run\.app/?$') {
+  Write-Warning "Expected Cloud Run default URL shape; if you use a custom domain, this regex is only a sanity check."
+}
+
 Invoke-RestMethod "$apiUrl/healthz"
 Invoke-RestMethod "$apiUrl/news/ticker?limit=5"
 Invoke-RestMethod "$apiUrl/crime/data-range"
@@ -172,6 +181,8 @@ gcloud run jobs execute "tenant-alert-daily-refresh-$env:ENVIRONMENT" `
   --region "$env:REGION" `
   --wait
 ```
+
+If the job fails immediately with **exit code 1**, open **Cloud Run → job execution → Logs**. A common failure was the worker importing `ingestion` while `sys.path` only contained `scripts/`; that is fixed in `scripts/daily_crime_refresh.py` and `Dockerfile.worker` (`PYTHONPATH=/app`). **Rebuild and push the worker image**, then `terraform apply` with the new `worker_image` tag.
 
 ## 8. Ongoing freshness
 
