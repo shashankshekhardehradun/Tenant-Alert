@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    LOCAL_DATA_DIR=/tmp/tenant-alert-data
+
+WORKDIR /app
+
+COPY requirements/base.txt requirements/base.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements/base.txt
+
+COPY pyproject.toml README.md ./
+COPY src src
+COPY api api
+COPY dbt dbt
+COPY ingestion ingestion
+COPY scripts scripts
+RUN pip install --no-cache-dir -e .
+
+CMD ["python", "scripts/daily_crime_refresh.py"]

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getCrimeOverview } from "../crimeOverview";
 import { CrimeDashboard } from "../../components/CrimeDashboard";
+import { LiveNewsTicker } from "../../components/LiveNewsTicker";
 
 export default async function GraphsPage() {
   const { overview, error, note } = await getCrimeOverview();
@@ -30,14 +31,14 @@ export default async function GraphsPage() {
       <nav className="bulletin-nav">
         <Link className="nav-link" href="/graphs">Front Page</Link>
         <Link className="nav-link" href="/map">The Map Room</Link>
+        <Link className="nav-link" href="/risk">Risk Receipt</Link>
         <Link className="nav-link" href="/boroughs/manhattan">Borough Files</Link>
       </nav>
-      <div className="ticker live-ticker">
-        <span>Stay woke. Stay safe. This is NYC.</span>
-        <span>Data refreshed from BigQuery gold marts.</span>
-        <span>Population-normalized risk now on page one.</span>
-        <span>Stay woke. Stay safe. This is NYC.</span>
-      </div>
+      <LiveNewsTicker fallbackItems={[
+        "Stay woke. Stay safe. This is NYC.",
+        "Data refreshed from BigQuery gold marts.",
+        "Population-normalized risk now on page one.",
+      ]} />
       {note ? (
         <p className="paper-card blotter-note" style={{ margin: "1rem 0 0", padding: "0.75rem" }}>{note}</p>
       ) : null}

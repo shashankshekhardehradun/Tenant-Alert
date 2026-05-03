@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getCrimeOverview } from "../crimeOverview";
 import { CrimeDashboard } from "../../components/CrimeDashboard";
+import { LiveNewsTicker } from "../../components/LiveNewsTicker";
 
 export default async function MapPage() {
   const { overview, error, note } = await getCrimeOverview({ latestDayOnly: true, mapLimit: 5000 });
@@ -30,14 +31,14 @@ export default async function MapPage() {
       <nav className="bulletin-nav">
         <Link className="nav-link" href="/graphs">Front Page</Link>
         <Link className="nav-link" href="/map">The Map Room</Link>
+        <Link className="nav-link" href="/risk">Risk Receipt</Link>
         <Link className="nav-link" href="/boroughs/manhattan">Borough Files</Link>
       </nav>
-      <div className="ticker live-ticker">
-        <span>Latest-day map only</span>
-        <span>Drag, tilt, filter, investigate</span>
-        <span>Every marker links back to source data</span>
-        <span>Latest-day map only</span>
-      </div>
+      <LiveNewsTicker fallbackItems={[
+        "Latest-day map only.",
+        "Drag, filter, investigate.",
+        "Every marker links back to source data.",
+      ]} />
       {note ? (
         <p className="paper-card blotter-note" style={{ margin: "1rem 0 0", padding: "0.75rem" }}>{note}</p>
       ) : null}

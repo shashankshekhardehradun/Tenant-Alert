@@ -35,3 +35,17 @@ models:
     columns:
       - name: nta_code
         tests: [not_null, unique]
+  - name: features_crime_risk_hourly
+    columns:
+      - name: feature_date
+        tests: [not_null]
+      - name: borough
+        tests: [not_null]
+      - name: hour
+        tests: [not_null]
+      - name: crime_pressure_score
+        tests: [not_null]
+  - name: predictions_crime_risk_latest
+    columns:
+      - name: predicted_crime_pressure_score
+        tests: [not_null]

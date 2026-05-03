@@ -174,20 +174,61 @@ select {
   border-bottom: 2px solid var(--ink);
   background: var(--crime-red);
   color: var(--paper-soft);
-  font-family: Impact, "Arial Narrow", sans-serif;
-  letter-spacing: 0.08em;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.035em;
   padding: 0.4rem 0.6rem;
+  text-rendering: geometricPrecision;
   text-transform: uppercase;
+  -webkit-font-smoothing: antialiased;
 }
 
 .live-ticker {
   white-space: nowrap;
 }
 
-.live-ticker span {
+.live-ticker > span {
   display: inline-block;
   padding-right: 4rem;
   animation: ticker-scroll 20s linear infinite;
+}
+
+.news-ticker {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  padding: 0;
+}
+
+.ticker-source {
+  flex: 0 0 auto;
+  background: var(--ink);
+  border-right: 2px solid var(--paper-soft);
+  color: var(--paper-soft);
+  padding: 0.45rem 0.65rem;
+}
+
+.ticker-track {
+  display: flex;
+  min-width: max-content;
+  animation: ticker-scroll 92s linear infinite;
+}
+
+.ticker-track a,
+.ticker-track span {
+  display: inline-block;
+  padding: 0.45rem 2.5rem 0.45rem 0;
+  text-decoration: none;
+}
+
+.ticker-track a::after,
+.ticker-track span::after {
+  content: " · ";
+  padding-left: 2.5rem;
+}
+
+.news-ticker:hover .ticker-track {
+  animation-play-state: paused;
 }
 
 @keyframes ticker-scroll {
@@ -727,6 +768,339 @@ select {
   padding-top: 0.45rem;
 }
 
+.risk-layout {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  align-items: start;
+}
+
+.risk-form-card {
+  padding: 1rem;
+}
+
+.risk-form-card h2 {
+  font-size: clamp(2.2rem, 5vw, 4.6rem);
+  margin: 0.6rem 0 0.35rem;
+}
+
+.risk-demographics {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 1rem 0;
+}
+
+.risk-demographics label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-family: var(--font-typewriter), "Courier New", monospace;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+}
+
+.risk-demographics input {
+  border: 2px solid var(--ink);
+  background: #f4e3bf;
+  color: var(--ink);
+  padding: 0.55rem;
+}
+
+.risk-fieldset {
+  border: 2px solid rgba(23, 17, 13, 0.45);
+  margin: 0.8rem 0;
+  padding: 0.7rem;
+}
+
+.risk-fieldset legend {
+  background: var(--ink);
+  color: var(--paper-soft);
+  font-family: var(--font-headline), Impact, "Arial Narrow", sans-serif;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.45rem;
+  text-transform: uppercase;
+}
+
+.risk-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.risk-chip {
+  border: 2px solid var(--ink);
+  background: #f8edcf;
+  box-shadow: 2px 2px 0 rgba(23, 17, 13, 0.18);
+  color: var(--ink);
+  cursor: pointer;
+  font-family: var(--font-typewriter), "Courier New", monospace;
+  padding: 0.48rem 0.6rem;
+  transform: rotate(-0.3deg);
+}
+
+.risk-chip:nth-child(even) {
+  transform: rotate(0.35deg);
+}
+
+.risk-chip.active,
+.risk-chip:hover {
+  background: var(--crime-red);
+  color: var(--paper-soft);
+}
+
+.receipt-button {
+  width: 100%;
+  border: 3px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper-soft);
+  cursor: pointer;
+  font-family: var(--font-headline), Impact, "Arial Narrow", sans-serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+  margin-top: 0.6rem;
+  padding: 0.75rem;
+  text-transform: uppercase;
+}
+
+.feature-map-card {
+  border: 2px dashed var(--ink);
+  background: rgba(255, 255, 255, 0.28);
+  margin-top: 1rem;
+  padding: 0.75rem;
+}
+
+.feature-map-card h3 {
+  font-size: 1.45rem;
+  margin: 0 0 0.65rem;
+}
+
+.feature-map-card p {
+  display: grid;
+  gap: 0.25rem;
+  grid-template-columns: 0.8fr 1.2fr 0.8fr;
+  border-top: 1px solid rgba(23, 17, 13, 0.25);
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  margin: 0;
+  padding: 0.45rem 0;
+}
+
+.feature-map-card strong,
+.feature-map-card em {
+  color: var(--ink);
+}
+
+.feature-map-card em {
+  font-style: normal;
+  font-family: var(--font-typewriter), "Courier New", monospace;
+}
+
+.receipt-stack {
+  display: grid;
+  gap: 1rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.bodega-receipt {
+  position: relative;
+  background:
+    repeating-linear-gradient(0deg, rgba(23, 17, 13, 0.04) 0 1px, transparent 1px 5px),
+    #fff8df;
+  border: 2px solid var(--ink);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.26);
+  color: var(--ink);
+  font-family: var(--font-typewriter), "Courier New", monospace;
+  padding: 1rem;
+}
+
+.bodega-receipt::before,
+.bodega-receipt::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background:
+    linear-gradient(135deg, transparent 0 45%, #fff8df 46% 54%, transparent 55%) 0 0 / 18px 12px repeat-x;
+}
+
+.bodega-receipt::before {
+  top: -11px;
+}
+
+.bodega-receipt::after {
+  bottom: -11px;
+  transform: rotate(180deg);
+}
+
+.bodega-receipt h2 {
+  font-family: var(--font-headline), Impact, "Arial Narrow", sans-serif;
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  margin: 0 0 0.5rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.receipt-rule {
+  margin: 0.45rem 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.receipt-row,
+.receipt-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.35rem 0;
+}
+
+.receipt-row span {
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.receipt-row strong {
+  max-width: 48%;
+  text-align: right;
+}
+
+.receipt-total {
+  border-top: 2px solid var(--ink);
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding-top: 0.45rem;
+}
+
+.receipt-verdict {
+  font-weight: 700;
+  margin: 0.7rem 0 0.2rem;
+}
+
+.bodega-receipt blockquote {
+  border: 3px solid var(--crime-red);
+  color: var(--crime-red);
+  font-family: var(--font-headline), Impact, "Arial Narrow", sans-serif;
+  font-size: 2rem;
+  line-height: 1;
+  margin: 0.25rem 0 0.7rem;
+  padding: 0.55rem;
+  text-align: center;
+  text-transform: uppercase;
+  transform: rotate(-1deg);
+}
+
+.receipt-persona {
+  border-top: 2px dashed var(--ink);
+  margin: 0.65rem 0 0;
+  padding-top: 0.5rem;
+}
+
+.receipt-empty {
+  border: 2px dashed var(--ink);
+  margin: 0.75rem 0 0;
+  padding: 0.6rem;
+  text-align: center;
+}
+
+.explainability-panel {
+  padding: 1rem;
+}
+
+.explainability-panel h3 {
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  margin: 0.8rem 0;
+}
+
+.handmade-bars {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.handmade-bar {
+  position: relative;
+}
+
+.handmade-bar span,
+.handmade-bar strong {
+  display: inline-block;
+  font-family: var(--font-typewriter), "Courier New", monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.handmade-bar strong {
+  float: right;
+}
+
+.handmade-bar i {
+  display: block;
+  height: 0.95rem;
+  margin: 0.25rem 0;
+  background:
+    repeating-linear-gradient(-12deg, rgba(255, 255, 255, 0.18) 0 3px, transparent 3px 6px),
+    var(--crime-red);
+  border: 2px solid var(--ink);
+  border-radius: 999px 42px 999px 36px;
+  transform: rotate(-0.4deg);
+}
+
+.handmade-bar:nth-child(even) i {
+  background:
+    repeating-linear-gradient(12deg, rgba(255, 255, 255, 0.2) 0 3px, transparent 3px 6px),
+    var(--warning);
+  transform: rotate(0.5deg);
+}
+
+.handmade-bar p {
+  clear: both;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.risk-tip {
+  background: #f7ee90;
+  border: 2px solid var(--ink);
+  font-family: var(--font-typewriter), "Courier New", monospace;
+  margin: 0.85rem 0 0;
+  padding: 0.6rem;
+  transform: rotate(-1deg);
+}
+
+.feature-importance-list {
+  border-top: 2px solid var(--ink);
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+}
+
+.feature-importance-list h4 {
+  font-family: var(--font-headline), Impact, "Arial Narrow", sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.45rem;
+  text-transform: uppercase;
+}
+
+.feature-importance-list p {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px dashed rgba(23, 17, 13, 0.35);
+  font-family: var(--font-typewriter), "Courier New", monospace;
+  font-size: 0.8rem;
+  margin: 0;
+  padding: 0.3rem 0;
+}
+
 .push-pin {
   position: absolute;
   top: -0.45rem;
@@ -1086,6 +1460,18 @@ select {
   }
 
   .map-headline-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .risk-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .receipt-stack {
+    position: static;
+  }
+
+  .feature-map-card p {
     grid-template-columns: 1fr;
   }
 }
