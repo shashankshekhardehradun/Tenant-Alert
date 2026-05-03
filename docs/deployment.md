@@ -65,7 +65,7 @@ docker push $workerImage
 
 Terraform grants **public** `roles/run.invoker` to `allUsers` on the API and web services when `api_allow_unauthenticated` / `web_allow_unauthenticated` are true (defaults), so you do not need manual `gcloud run services add-iam-policy-binding` for a public portfolio deployment. Set them to `false` if your org blocks `allUsers` on Cloud Run.
 
-The API reads CORS from container env: **`CORS_ALLOW_ORIGINS`** (comma-separated exact origins) and optional **`CORS_ALLOW_ORIGIN_REGEX`** (defaults to matching `https://*.a.run.app` so the deployed Next.js URL can call the API without a second apply). Add your custom domain origins to `cors_allow_origins` after domain mapping (see §9).
+The API reads CORS from container env: **`CORS_ALLOW_ORIGINS`** (comma-separated exact origins) and optional **`CORS_ALLOW_ORIGIN_REGEX`** (defaults to matching `https://*.a.run.app` so the deployed Next.js URL can call the API without a second apply). After domain mapping, add your site with **`-var="cors_allow_origins_extra=https://your-domain"`** (see optional flags below) or §9.
 
 ```powershell
 cd D:\Tenant-Alert\infra
@@ -92,9 +92,11 @@ terraform apply `
 
 Optional Terraform flags (defaults are usually enough):
 
-- `-var='cors_allow_origins=["http://localhost:3000","https://app.example.com"]'` — exact browser origins allowed to call the API.
+- **`-var="cors_allow_origins_extra=https://nycroulette.net"`** (recommended on **PowerShell**) — comma-separated **extra** origins appended to the default localhost list. No JSON or HCL list syntax, so you avoid **`Missing item separator`** errors from `-var='cors_allow_origins=[...]'` on Windows.
 - `-var='cors_allow_origin_regex='` — empty string disables the default `*.a.run.app` regex (stricter CORS).
 - `-var="api_allow_unauthenticated=false"` — keep the API private (then use authenticated clients or a load balancer / IAP).
+
+**Overriding the full `cors_allow_origins` list** (advanced): use a **`.tfvars`** file in `infra/` (e.g. `cors.auto.tfvars`, gitignored by `*.auto.tfvars`) with a multi-line HCL `list`, or set **`TF_VAR_cors_allow_origins`** to a **JSON** array (Terraform expects JSON for complex types from the environment), e.g. `$env:TF_VAR_cors_allow_origins='["http://localhost:3000","https://nycroulette.net"]'` then run `terraform apply` without `-var` for that variable.
 
 Capture the API URL:
 
@@ -215,7 +217,7 @@ News ticker freshness is request-time through FastAPI with a 10-minute in-memory
 1. **Verify** domain ownership (Google Search Console or the flow linked from Cloud Run).
 2. In **Cloud Run** → service **`tenant-alert-web-<environment>`** → **Custom domains** → add e.g. `app.yourdomain.com` → create the **DNS records** the wizard shows (often **CNAME** to a Google target).
 3. Repeat for **`tenant-alert-api-<environment>`** with e.g. `api.yourdomain.com` if you want a dedicated API hostname.
-4. Run **`terraform apply`** and pass **`cors_allow_origins`** including **`https://app.yourdomain.com`** so the API allows your real web origin (the default `*.a.run.app` regex does not match a custom hostname).
+4. Run **`terraform apply`** and pass **`-var="cors_allow_origins_extra=https://app.yourdomain.com"`** (and other `-var` image flags as usual) so the API allows your real web origin (the default `*.a.run.app` regex does not match a custom hostname).
 5. **Rebuild the web image** with `--build-arg NEXT_PUBLIC_API_URL=https://api.yourdomain.com` (or your chosen API URL), **push**, and **`terraform apply`** again with the new `web_image` (and rebuilt `api_image` if you changed only Terraform env for CORS—API image unchanged unless you changed Python).
 6. In **APIs & Services** → **Credentials**, restrict the Maps browser key **HTTP referrers** to `https://app.yourdomain.com/*` (and localhost for dev if desired).
 
