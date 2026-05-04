@@ -51,17 +51,19 @@ export function LiveNewsTicker({ fallbackItems }: { fallbackItems: string[] }) {
   return (
     <div className="ticker live-ticker news-ticker" aria-label="Latest NYC public safety headlines">
       <span className="ticker-source">WIRE: {source}</span>
-      <div className="ticker-track">
-        {tickerItems.map((item, index) => {
-          const label = `${item.borough ?? "NYC"}: ${item.title}`;
-          return item.url ? (
-            <a href={item.url} key={`${item.title}-${index}`} rel="noreferrer" target="_blank">
-              {label}
-            </a>
-          ) : (
-            <span key={`${item.title}-${index}`}>{label}</span>
-          );
-        })}
+      <div className="ticker-track-shell">
+        <div className="ticker-track">
+          {tickerItems.map((item, index) => {
+            const label = `${item.borough ?? "NYC"}: ${item.title}`;
+            return item.url ? (
+              <a href={item.url} key={`${item.title}-${index}`} rel="noreferrer" target="_blank">
+                {label}
+              </a>
+            ) : (
+              <span key={`${item.title}-${index}`}>{label}</span>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

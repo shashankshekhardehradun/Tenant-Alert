@@ -190,29 +190,33 @@ select {
   white-space: nowrap;
 }
 
-.live-ticker > span {
-  display: inline-block;
-  padding-right: 4rem;
-  animation: ticker-scroll 20s linear infinite;
-}
-
 .news-ticker {
-  align-items: center;
+  align-items: stretch;
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
   padding: 0;
 }
 
 .ticker-source {
   flex: 0 0 auto;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
   background: var(--ink);
   border-right: 2px solid var(--paper-soft);
   color: var(--paper-soft);
   padding: 0.45rem 0.65rem;
 }
 
+.ticker-track-shell {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .ticker-track {
   display: flex;
+  align-items: center;
   min-width: max-content;
   animation: ticker-scroll 92s linear infinite;
 }
@@ -1675,12 +1679,17 @@ select {
     padding: 0.4rem 0.5rem;
   }
 
-  .news-ticker .ticker-track {
+  .news-ticker .ticker-track-shell {
+    width: 100%;
     min-width: 0;
-    max-width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .news-ticker .ticker-track {
+    min-width: 0;
+    max-width: 100%;
     animation: none;
     flex-wrap: wrap;
     justify-content: flex-start;
@@ -1772,12 +1781,11 @@ select {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ticker-track,
-  .live-ticker > span {
+  .ticker-track {
     animation: none !important;
   }
 
-  .news-ticker .ticker-track {
+  .news-ticker .ticker-track-shell {
     overflow-x: auto;
   }
 }
