@@ -17,7 +17,7 @@ models:
         tests: [not_null]
       - name: signal_category
         tests: [not_null]
-  - name: silver_mta_subway_alerts
+  - name: silver_mta_service_alerts
     columns:
       - name: alert_id
         tests: [not_null]

@@ -1,15 +1,15 @@
-"""Command-line runner for MTA subway alerts ingestion."""
+"""Command-line runner for MTA service alerts ingestion."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from ingestion.mta.alerts import run_mta_subway_alerts_etl
+from ingestion.mta.alerts import run_mta_service_alerts_etl
 from tenant_alert.config import settings
 
 
 def main() -> None:
-    result = run_mta_subway_alerts_etl(
+    result = run_mta_service_alerts_etl(
         local_data_dir=Path(settings.local_data_dir),
         upload_to_gcs=True,
         load_to_bigquery=True,

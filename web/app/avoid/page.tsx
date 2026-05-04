@@ -16,7 +16,7 @@ type AvoidabilityItem = {
   crime_pressure_score?: number | null;
   late_night_pressure_score?: number | null;
   transit_chaos_score?: number | null;
-  subway_alert_count?: number | null;
+  transit_alert_count?: number | null;
   affected_route_count?: number | null;
   avoidability_score?: number | null;
   avoidability_band?: string | null;
@@ -26,6 +26,7 @@ type AvoidabilityItem = {
   top_complaint_type?: string | null;
   top_descriptor?: string | null;
   top_incident_zip?: string | null;
+  top_transit_mode?: string | null;
   top_transit_route?: string | null;
   top_transit_alert_type?: string | null;
   top_transit_header?: string | null;
@@ -167,8 +168,8 @@ export default async function AvoidPage() {
                   <em>all signals</em>
                 </div>
                 <div>
-                  <span>Subway alerts</span>
-                  <strong>{formatNumber(item.subway_alert_count)}</strong>
+                  <span>Transit alerts</span>
+                  <strong>{formatNumber(item.transit_alert_count)}</strong>
                   <em>{formatNumber(item.affected_route_count)} routes</em>
                 </div>
               </div>
@@ -179,7 +180,8 @@ export default async function AvoidPage() {
               </div>
               {item.top_transit_header ? (
                 <div className="classified-item">
-                  Transit chaos: {item.top_transit_route ? `[${item.top_transit_route}] ` : ""}
+                  Transit chaos: {item.top_transit_mode ? `${item.top_transit_mode.toUpperCase()} ` : ""}
+                  {item.top_transit_route ? `[${item.top_transit_route}] ` : ""}
                   {item.top_transit_alert_type ?? "Service alert"} · {item.top_transit_header}
                 </div>
               ) : null}
@@ -198,7 +200,7 @@ export default async function AvoidPage() {
           <div className="avoid-receipt">
             <p><span>Historical pressure</span><strong>existing gold crime mart</strong></p>
             <p><span>Street signal score</span><strong>daily 311 ETL</strong></p>
-            <p><span>Transit chaos</span><strong>MTA subway alert JSON</strong></p>
+            <p><span>Transit chaos</span><strong>MTA subway + bus alert JSON</strong></p>
             <p><span>LLM magic</span><strong>none, just templates</strong></p>
           </div>
         </section>

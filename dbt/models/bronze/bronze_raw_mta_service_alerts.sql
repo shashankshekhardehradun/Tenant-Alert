@@ -3,6 +3,7 @@
 select
   snapshot_ts,
   feed_timestamp,
+  mode,
   alert_id,
   alert_type,
   header_text,
@@ -13,4 +14,4 @@ select
   created_at_ts,
   updated_at_ts,
   informed_entity_count
-from {{ source('raw', 'raw_mta_subway_alerts') }}
+from {{ source('raw', 'raw_mta_service_alerts') }}

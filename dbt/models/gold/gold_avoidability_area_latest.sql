@@ -115,18 +115,19 @@ crime_scored as (
 
 mta_bounds as (
     select max(snapshot_date) as max_mta_day
-    from {{ ref('silver_mta_subway_alerts') }}
+    from {{ ref('silver_mta_service_alerts') }}
 ),
 
 transit_rollup as (
     select
       alerts.borough_hint as borough,
       max(alerts.snapshot_date) as latest_mta_day,
-      count(distinct alerts.alert_id) as subway_alert_count,
+      count(distinct alerts.alert_id) as transit_alert_count,
       count(distinct alerts.route_id) as affected_route_count,
       least(20, round(sum(alerts.alert_weight) / 2)) as transit_chaos_score,
       array_agg(
         struct(
+          alerts.mode as mode,
           alerts.route_id as route_id,
           alerts.alert_type as alert_type,
           alerts.header_text as header_text,
@@ -135,7 +136,7 @@ transit_rollup as (
         order by alerts.alert_weight desc, alerts.updated_at_ts desc nulls last
         limit 1
       )[offset(0)] as top_transit_alert
-    from {{ ref('silver_mta_subway_alerts') }} as alerts
+    from {{ ref('silver_mta_service_alerts') }} as alerts
     cross join mta_bounds as bounds
     where alerts.snapshot_date = bounds.max_mta_day
       and alerts.borough_hint != 'NYC'
@@ -155,7 +156,7 @@ combined as (
       coalesce(crime.crime_pressure_score, 0) as crime_pressure_score,
       coalesce(crime.late_night_pressure_score, 0) as late_night_pressure_score,
       coalesce(transit.transit_chaos_score, 0) as transit_chaos_score,
-      coalesce(transit.subway_alert_count, 0) as subway_alert_count,
+      coalesce(transit.transit_alert_count, 0) as transit_alert_count,
       coalesce(transit.affected_route_count, 0) as affected_route_count,
       street.top_signal,
       transit.top_transit_alert,
@@ -183,7 +184,7 @@ select
   crime_pressure_score,
   late_night_pressure_score,
   transit_chaos_score,
-  subway_alert_count,
+  transit_alert_count,
   affected_route_count,
   least(
     99,
@@ -220,6 +221,7 @@ select
   top_signal.complaint_type as top_complaint_type,
   top_signal.descriptor as top_descriptor,
   top_signal.incident_zip as top_incident_zip,
+  top_transit_alert.mode as top_transit_mode,
   top_transit_alert.route_id as top_transit_route,
   top_transit_alert.alert_type as top_transit_alert_type,
   top_transit_alert.header_text as top_transit_header,
@@ -263,8 +265,8 @@ select
     )
     when 3 then concat(
       'The city is doing city things here: ', cast(street_signal_count_7d as string),
-      ' signal calls in seven days and ', cast(subway_alert_count as string),
-      ' subway alerts in the mix.'
+      ' signal calls in seven days and ', cast(transit_alert_count as string),
+      ' transit alerts in the mix.'
     )
     else concat(
       'Proceed like you have a charged phone, a backup route, and no need to prove a point. ',

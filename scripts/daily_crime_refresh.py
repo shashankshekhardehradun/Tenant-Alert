@@ -17,7 +17,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from ingestion.crime.nypd_complaints import run_nypd_complaints_etl  # noqa: E402
-from ingestion.mta.alerts import run_mta_subway_alerts_etl  # noqa: E402
+from ingestion.mta.alerts import run_mta_service_alerts_etl  # noqa: E402
 from ingestion.nyc311.jobs import run_311_partition_etl  # noqa: E402
 
 from tenant_alert.config import settings  # noqa: E402
@@ -60,14 +60,14 @@ def run_dbt_models() -> None:
             "dbt",
             "--select",
             "bronze_raw_311_complaints",
-            "bronze_raw_mta_subway_alerts",
+            "bronze_raw_mta_service_alerts",
             "bronze_raw_nypd_complaints",
             "silver_crime_events",
             "gold_fct_crime_events",
             "gold_agg_demographics_by_nta",
             "features_crime_risk_hourly",
             "silver_311_street_signals",
-            "silver_mta_subway_alerts",
+            "silver_mta_service_alerts",
             "gold_avoidability_area_latest",
         ],
         [
@@ -155,12 +155,12 @@ def main() -> None:
         )
 
     if not args.skip_mta:
-        mta_result = run_mta_subway_alerts_etl(
+        mta_result = run_mta_service_alerts_etl(
             local_data_dir=Path(settings.local_data_dir),
             upload_to_gcs=True,
             load_to_bigquery=True,
         )
-        print(f"mta_subway_alert_rows={mta_result.row_count}", flush=True)
+        print(f"mta_service_alert_rows={mta_result.row_count}", flush=True)
 
     if not args.skip_dbt:
         run_dbt_models()

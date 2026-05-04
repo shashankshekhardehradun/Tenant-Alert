@@ -1,7 +1,7 @@
 {{ config(
     materialized='table',
     partition_by={"field": "snapshot_date", "data_type": "date"},
-    cluster_by=["borough_hint", "alert_type"]
+    cluster_by=["borough_hint", "mode", "alert_type"]
 ) }}
 
 with base as (
@@ -9,6 +9,7 @@ with base as (
       snapshot_ts,
       date(snapshot_ts) as snapshot_date,
       feed_timestamp,
+      mode,
       alert_id,
       coalesce(nullif(trim(alert_type), ''), 'Service Alert') as alert_type,
       header_text,
@@ -18,7 +19,7 @@ with base as (
       created_at_ts,
       updated_at_ts,
       informed_entity_count
-    from {{ ref('bronze_raw_mta_subway_alerts') }}
+    from {{ ref('bronze_raw_mta_service_alerts') }}
     where alert_id is not null
 ),
 
@@ -56,24 +57,47 @@ route_borough_map as (
     select '7', 'MANHATTAN' union all select '7', 'QUEENS' union all
     select 'S', 'MANHATTAN' union all select 'FS', 'BROOKLYN' union all
     select 'GS', 'MANHATTAN' union all select 'SIR', 'STATEN ISLAND'
+),
+
+bus_borough_map as (
+    select 'B' as route_prefix, 'BROOKLYN' as borough_hint union all
+    select 'BM', 'MANHATTAN' union all
+    select 'BX', 'BRONX' union all
+    select 'M', 'MANHATTAN' union all
+    select 'Q', 'QUEENS' union all
+    select 'QM', 'MANHATTAN' union all
+    select 'S', 'STATEN ISLAND' union all
+    select 'SIM', 'MANHATTAN'
+),
+
+classified as (
+    select
+      expanded.*,
+      regexp_extract(upper(expanded.route_id), r'^[A-Z]+') as route_prefix
+    from expanded
 )
 
 select
   snapshot_ts,
   snapshot_date,
   feed_timestamp,
+  mode,
   alert_id,
   alert_type,
   header_text,
   route_ids,
-  expanded.route_id,
-  coalesce(route_borough_map.borough_hint, 'NYC') as borough_hint,
+  classified.route_id,
+  case
+    when mode = 'subway' then coalesce(route_borough_map.borough_hint, 'NYC')
+    when mode = 'bus' then coalesce(bus_borough_map.borough_hint, 'NYC')
+    else 'NYC'
+  end as borough_hint,
   case
     when lower(alert_type) like '%delay%' then 8
     when lower(alert_type) like '%planned%' then 3
     when lower(alert_type) like '%service change%' then 6
     when lower(header_text) like '%suspended%' then 10
-    when lower(header_text) like '%no train%' then 10
+    when lower(header_text) like '%no train%' or lower(header_text) like '%no bus%' then 10
     else 5
   end as alert_weight,
   active_start_ts,
@@ -81,10 +105,15 @@ select
   created_at_ts,
   updated_at_ts,
   informed_entity_count
-from expanded
-left join route_borough_map using (route_id)
-where expanded.route_id != ''
+from classified
+left join route_borough_map
+  on classified.mode = 'subway'
+ and classified.route_id = route_borough_map.route_id
+left join bus_borough_map
+  on classified.mode = 'bus'
+ and classified.route_prefix = bus_borough_map.route_prefix
+where classified.route_id != ''
 qualify row_number() over (
-  partition by snapshot_date, alert_id, route_id, borough_hint
+  partition by snapshot_date, mode, alert_id, route_id, borough_hint
   order by updated_at_ts desc nulls last, snapshot_ts desc
 ) = 1

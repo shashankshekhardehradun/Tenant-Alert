@@ -1,4 +1,4 @@
-"""MTA subway service alert ingestion from public JSON feeds."""
+"""MTA service alert ingestion from public JSON feeds."""
 
 from __future__ import annotations
 
@@ -17,13 +17,15 @@ from ingestion.common.bigquery import delete_rows_for_partition_date, load_parqu
 from ingestion.common.storage import upload_file_to_gcs
 from tenant_alert.config import settings
 
-MTA_SUBWAY_ALERTS_JSON_URL = (
-    "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts.json"
-)
-RAW_MTA_SUBWAY_ALERTS_TABLE = "raw_mta_subway_alerts"
+MTA_ALERT_FEEDS = {
+    "subway": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts.json",
+    "bus": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fbus-alerts.json",
+}
+RAW_MTA_SERVICE_ALERTS_TABLE = "raw_mta_service_alerts"
 MTA_ALERTS_SCHEMA = [
     bigquery.SchemaField("snapshot_ts", "TIMESTAMP"),
     bigquery.SchemaField("feed_timestamp", "TIMESTAMP"),
+    bigquery.SchemaField("mode", "STRING"),
     bigquery.SchemaField("alert_id", "STRING"),
     bigquery.SchemaField("alert_type", "STRING"),
     bigquery.SchemaField("header_text", "STRING"),
@@ -70,7 +72,11 @@ def _csv(values: set[str]) -> str:
     return ",".join(sorted(value for value in values if value))
 
 
-def _flatten_alerts(payload: dict[str, Any], snapshot_ts: dt.datetime) -> list[dict[str, Any]]:
+def _flatten_alerts(
+    payload: dict[str, Any],
+    snapshot_ts: dt.datetime,
+    mode: str,
+) -> list[dict[str, Any]]:
     feed_timestamp = _epoch_to_datetime((payload.get("header") or {}).get("timestamp"))
     rows: list[dict[str, Any]] = []
     for entity in payload.get("entity") or []:
@@ -85,6 +91,7 @@ def _flatten_alerts(payload: dict[str, Any], snapshot_ts: dt.datetime) -> list[d
                 {
                     "snapshot_ts": snapshot_ts,
                     "feed_timestamp": feed_timestamp,
+                    "mode": mode,
                     "alert_id": str(entity.get("id") or ""),
                     "alert_type": str(mercury.get("alert_type") or "Service Alert"),
                     "header_text": _translation_text(alert.get("header_text")),
@@ -100,13 +107,13 @@ def _flatten_alerts(payload: dict[str, Any], snapshot_ts: dt.datetime) -> list[d
     return rows
 
 
-def run_mta_subway_alerts_etl(
+def run_mta_service_alerts_etl(
     *,
     local_data_dir: Path | None = None,
     upload_to_gcs: bool = False,
     load_to_bigquery: bool = False,
 ) -> MtaAlertsResult:
-    """Fetch current public MTA subway alerts, land parquet, and optionally load bronze."""
+    """Fetch current public MTA subway/bus alerts, land parquet, and optionally load bronze."""
     snapshot_ts = dt.datetime.now(dt.UTC).replace(tzinfo=None)
     partition_date = snapshot_ts.date()
     local_root = local_data_dir or Path(settings.local_data_dir)
@@ -114,16 +121,17 @@ def run_mta_subway_alerts_etl(
         local_root
         / "raw"
         / "mta"
-        / "subway_alerts"
+        / "service_alerts"
         / f"snapshot_date={partition_date.isoformat()}"
-        / "raw_mta_subway_alerts.parquet"
+        / "raw_mta_service_alerts.parquet"
     )
+    rows: list[dict[str, Any]] = []
     with httpx.Client(timeout=30.0) as client:
-        response = client.get(MTA_SUBWAY_ALERTS_JSON_URL)
-        response.raise_for_status()
-        payload = response.json()
+        for mode, url in MTA_ALERT_FEEDS.items():
+            response = client.get(url)
+            response.raise_for_status()
+            rows.extend(_flatten_alerts(response.json(), snapshot_ts, mode))
 
-    rows = _flatten_alerts(payload, snapshot_ts)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     frame = pl.DataFrame(rows, strict=False) if rows else pl.DataFrame(schema={})
     if rows:
@@ -136,8 +144,8 @@ def run_mta_subway_alerts_etl(
         if not settings.raw_bucket_name:
             raise ValueError("upload_to_gcs=True requires GCS_RAW_BUCKET or GCP_PROJECT_ID")
         blob_name = (
-            f"mta/subway_alerts/snapshot_date={partition_date.isoformat()}/"
-            "raw_mta_subway_alerts.parquet"
+            f"mta/service_alerts/snapshot_date={partition_date.isoformat()}/"
+            "raw_mta_service_alerts.parquet"
         )
         gcs_uri = upload_file_to_gcs(output_path, settings.raw_bucket_name, blob_name)
 
@@ -150,7 +158,7 @@ def run_mta_subway_alerts_etl(
             delete_rows_for_partition_date(
                 project_id=settings.gcp_project_id,
                 dataset_id=settings.bq_dataset_bronze,
-                table_id=RAW_MTA_SUBWAY_ALERTS_TABLE,
+                table_id=RAW_MTA_SERVICE_ALERTS_TABLE,
                 partition_date=partition_date,
                 partition_field="snapshot_ts",
             )
@@ -161,10 +169,10 @@ def run_mta_subway_alerts_etl(
                 gcs_uri,
                 project_id=settings.gcp_project_id,
                 dataset_id=settings.bq_dataset_bronze,
-                table_id=RAW_MTA_SUBWAY_ALERTS_TABLE,
+                table_id=RAW_MTA_SERVICE_ALERTS_TABLE,
                 schema=MTA_ALERTS_SCHEMA,
                 partition_field="snapshot_ts",
-                clustering_fields=["alert_type", "route_ids"],
+                clustering_fields=["mode", "alert_type"],
             )
 
     return MtaAlertsResult(
