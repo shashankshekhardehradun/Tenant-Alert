@@ -17,6 +17,14 @@ models:
         tests: [not_null]
       - name: signal_category
         tests: [not_null]
+  - name: silver_mta_subway_alerts
+    columns:
+      - name: alert_id
+        tests: [not_null]
+      - name: snapshot_date
+        tests: [not_null]
+      - name: borough_hint
+        tests: [not_null]
   - name: gold_avoidability_area_latest
     columns:
       - name: borough

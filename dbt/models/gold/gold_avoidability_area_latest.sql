@@ -113,9 +113,38 @@ crime_scored as (
     from crime_rollup
 ),
 
+mta_bounds as (
+    select max(snapshot_date) as max_mta_day
+    from {{ ref('silver_mta_subway_alerts') }}
+),
+
+transit_rollup as (
+    select
+      alerts.borough_hint as borough,
+      max(alerts.snapshot_date) as latest_mta_day,
+      count(distinct alerts.alert_id) as subway_alert_count,
+      count(distinct alerts.route_id) as affected_route_count,
+      least(20, round(sum(alerts.alert_weight) / 2)) as transit_chaos_score,
+      array_agg(
+        struct(
+          alerts.route_id as route_id,
+          alerts.alert_type as alert_type,
+          alerts.header_text as header_text,
+          alerts.alert_weight as alert_weight
+        )
+        order by alerts.alert_weight desc, alerts.updated_at_ts desc nulls last
+        limit 1
+      )[offset(0)] as top_transit_alert
+    from {{ ref('silver_mta_subway_alerts') }} as alerts
+    cross join mta_bounds as bounds
+    where alerts.snapshot_date = bounds.max_mta_day
+      and alerts.borough_hint != 'NYC'
+    group by alerts.borough_hint
+),
+
 combined as (
     select
-      coalesce(street.borough, crime.borough) as borough,
+      coalesce(street.borough, crime.borough, transit.borough) as borough,
       coalesce(street.street_signal_count_24h, 0) as street_signal_count_24h,
       coalesce(street.street_signal_count_7d, 0) as street_signal_count_7d,
       coalesce(street.avg_spike_ratio, 0) as avg_spike_ratio,
@@ -125,18 +154,25 @@ combined as (
       coalesce(crime.late_night_crime_count_90d, 0) as late_night_crime_count_90d,
       coalesce(crime.crime_pressure_score, 0) as crime_pressure_score,
       coalesce(crime.late_night_pressure_score, 0) as late_night_pressure_score,
-      0 as transit_chaos_score,
+      coalesce(transit.transit_chaos_score, 0) as transit_chaos_score,
+      coalesce(transit.subway_alert_count, 0) as subway_alert_count,
+      coalesce(transit.affected_route_count, 0) as affected_route_count,
       street.top_signal,
+      transit.top_transit_alert,
       (select max_signal_day from signal_bounds) as latest_signal_day,
-      crime.latest_crime_day
+      crime.latest_crime_day,
+      transit.latest_mta_day
     from street_rollup as street
     full outer join crime_scored as crime using (borough)
+    full outer join transit_rollup as transit
+      on transit.borough = coalesce(street.borough, crime.borough)
 )
 
 select
   borough,
   latest_signal_day,
   latest_crime_day,
+  latest_mta_day,
   street_signal_count_24h,
   street_signal_count_7d,
   avg_spike_ratio,
@@ -147,6 +183,8 @@ select
   crime_pressure_score,
   late_night_pressure_score,
   transit_chaos_score,
+  subway_alert_count,
+  affected_route_count,
   least(
     99,
     cast(
@@ -159,11 +197,20 @@ select
     )
   ) as avoidability_score,
   case
-    when least(99, crime_pressure_score + late_night_pressure_score + street_signal_score) >= 82
+    when least(
+      99,
+      crime_pressure_score + late_night_pressure_score + street_signal_score + transit_chaos_score
+    ) >= 82
       then 'I would avoid'
-    when least(99, crime_pressure_score + late_night_pressure_score + street_signal_score) >= 62
+    when least(
+      99,
+      crime_pressure_score + late_night_pressure_score + street_signal_score + transit_chaos_score
+    ) >= 62
       then 'Questionable vibes'
-    when least(99, crime_pressure_score + late_night_pressure_score + street_signal_score) >= 38
+    when least(
+      99,
+      crime_pressure_score + late_night_pressure_score + street_signal_score + transit_chaos_score
+    ) >= 38
       then 'Keep it moving'
     else 'Probably fine'
   end as avoidability_band,
@@ -173,6 +220,9 @@ select
   top_signal.complaint_type as top_complaint_type,
   top_signal.descriptor as top_descriptor,
   top_signal.incident_zip as top_incident_zip,
+  top_transit_alert.route_id as top_transit_route,
+  top_transit_alert.alert_type as top_transit_alert_type,
+  top_transit_alert.header_text as top_transit_header,
   case top_signal.category
     when 'noise' then 'Avoid if you need peace and quiet'
     when 'parking' then 'Avoid if you brought a car'
@@ -209,14 +259,15 @@ select
     )
     when 2 then concat(
       'If your plan requires calm exits, reconsider. Top signal: ',
-      coalesce(top_signal.complaint_type, 'city noise'), '.'
+      coalesce(top_transit_alert.alert_type, top_signal.complaint_type, 'city noise'), '.'
     )
     when 3 then concat(
       'The city is doing city things here: ', cast(street_signal_count_7d as string),
-      ' signal calls in seven days, plus late-night pressure.'
+      ' signal calls in seven days and ', cast(subway_alert_count as string),
+      ' subway alerts in the mix.'
     )
     else concat(
-      'Proceed like you have a charged phone and no need to prove a point. ',
+      'Proceed like you have a charged phone, a backup route, and no need to prove a point. ',
       coalesce(top_signal.category, 'vibes'), ' is carrying the warning.'
     )
   end as advice_copy,

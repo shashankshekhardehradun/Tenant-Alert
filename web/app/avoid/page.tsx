@@ -6,6 +6,7 @@ type AvoidabilityItem = {
   borough: string;
   latest_signal_day?: string | null;
   latest_crime_day?: string | null;
+  latest_mta_day?: string | null;
   street_signal_count_24h?: number | null;
   street_signal_count_7d?: number | null;
   avg_spike_ratio?: number | null;
@@ -15,6 +16,8 @@ type AvoidabilityItem = {
   crime_pressure_score?: number | null;
   late_night_pressure_score?: number | null;
   transit_chaos_score?: number | null;
+  subway_alert_count?: number | null;
+  affected_route_count?: number | null;
   avoidability_score?: number | null;
   avoidability_band?: string | null;
   top_signal_category?: string | null;
@@ -23,6 +26,9 @@ type AvoidabilityItem = {
   top_complaint_type?: string | null;
   top_descriptor?: string | null;
   top_incident_zip?: string | null;
+  top_transit_route?: string | null;
+  top_transit_alert_type?: string | null;
+  top_transit_header?: string | null;
   avoid_if?: string | null;
   stamp_label?: string | null;
   advice_copy?: string | null;
@@ -130,6 +136,7 @@ export default async function AvoidPage() {
           <p>
             Latest 311 street-signal day: <strong>{top?.latest_signal_day ?? "pending"}</strong> ·
             latest NYPD complaint day: <strong>{top?.latest_crime_day ?? "pending"}</strong> ·
+            latest MTA alert pull: <strong>{top?.latest_mta_day ?? "pending"}</strong> ·
             source: <strong>{payload.source}</strong>
           </p>
         </section>
@@ -160,9 +167,9 @@ export default async function AvoidPage() {
                   <em>all signals</em>
                 </div>
                 <div>
-                  <span>Open ratio</span>
-                  <strong>{formatPct(item.open_ratio)}</strong>
-                  <em>still unresolved</em>
+                  <span>Subway alerts</span>
+                  <strong>{formatNumber(item.subway_alert_count)}</strong>
+                  <em>{formatNumber(item.affected_route_count)} routes</em>
                 </div>
               </div>
               <div className="classified-item">
@@ -170,6 +177,12 @@ export default async function AvoidPage() {
                 {item.top_descriptor ? ` · ${item.top_descriptor}` : ""}
                 {item.top_incident_zip ? ` · ZIP ${item.top_incident_zip}` : ""}
               </div>
+              {item.top_transit_header ? (
+                <div className="classified-item">
+                  Transit chaos: {item.top_transit_route ? `[${item.top_transit_route}] ` : ""}
+                  {item.top_transit_alert_type ?? "Service alert"} · {item.top_transit_header}
+                </div>
+              ) : null}
             </article>
           ))}
         </section>
@@ -185,7 +198,7 @@ export default async function AvoidPage() {
           <div className="avoid-receipt">
             <p><span>Historical pressure</span><strong>existing gold crime mart</strong></p>
             <p><span>Street signal score</span><strong>daily 311 ETL</strong></p>
-            <p><span>Transit chaos</span><strong>reserved for MTA alerts</strong></p>
+            <p><span>Transit chaos</span><strong>MTA subway alert JSON</strong></p>
             <p><span>LLM magic</span><strong>none, just templates</strong></p>
           </div>
         </section>
