@@ -9,6 +9,20 @@ models:
     columns:
       - name: complaint_created_date
         tests: [not_null]
+  - name: silver_311_street_signals
+    columns:
+      - name: unique_key
+        tests: [not_null, unique]
+      - name: signal_date
+        tests: [not_null]
+      - name: signal_category
+        tests: [not_null]
+  - name: gold_avoidability_area_latest
+    columns:
+      - name: borough
+        tests: [not_null, unique]
+      - name: avoidability_score
+        tests: [not_null]
   - name: silver_crime_events
     columns:
       - name: complaint_id

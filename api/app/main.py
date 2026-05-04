@@ -5,7 +5,16 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.app.routers import analytics, buildings, compare, complaints, crime, neighborhoods, news
+from api.app.routers import (
+    analytics,
+    avoidability,
+    buildings,
+    compare,
+    complaints,
+    crime,
+    neighborhoods,
+    news,
+)
 
 _DEFAULT_CORS_ORIGINS = (
     "http://localhost:3000",
@@ -53,6 +62,7 @@ app.include_router(complaints.router, prefix="/complaints", tags=["complaints"])
 app.include_router(compare.router, prefix="/compare", tags=["compare"])
 app.include_router(crime.router, prefix="/crime", tags=["crime"])
 app.include_router(news.router, prefix="/news", tags=["news"])
+app.include_router(avoidability.router, prefix="/avoidability", tags=["avoidability"])
 
 
 @app.get("/")

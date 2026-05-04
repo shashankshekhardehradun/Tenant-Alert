@@ -17,6 +17,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from ingestion.crime.nypd_complaints import run_nypd_complaints_etl  # noqa: E402
+from ingestion.nyc311.jobs import run_311_partition_etl  # noqa: E402
 
 from tenant_alert.config import settings  # noqa: E402
 
@@ -35,7 +36,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--page-size", type=int, default=5_000)
     parser.add_argument("--skip-ingestion", action="store_true")
+    parser.add_argument("--skip-311", action="store_true")
     parser.add_argument("--skip-dbt", action="store_true")
+    parser.add_argument(
+        "--street-signal-days",
+        type=int,
+        default=7,
+        help="Rolling 311 partition days to refresh for late-arriving street-signal records.",
+    )
     return parser.parse_args()
 
 
@@ -49,11 +57,14 @@ def run_dbt_models() -> None:
             "--profiles-dir",
             "dbt",
             "--select",
+            "bronze_raw_311_complaints",
             "bronze_raw_nypd_complaints",
             "silver_crime_events",
             "gold_fct_crime_events",
             "gold_agg_demographics_by_nta",
             "features_crime_risk_hourly",
+            "silver_311_street_signals",
+            "gold_avoidability_area_latest",
         ],
         [
             "dbt",
@@ -82,6 +93,30 @@ def run_dbt_models() -> None:
         subprocess.run(command, check=True)
 
 
+def run_311_street_signal_partitions(
+    start_date: dt.date,
+    end_date: dt.date,
+    *,
+    page_size: int,
+) -> None:
+    """Refresh a rolling 311 partition window that powers the daily avoidability page."""
+    day = start_date
+    total_rows = 0
+    while day < end_date:
+        result = run_311_partition_etl(
+            day,
+            app_token=settings.soda_app_token or None,
+            local_data_dir=Path(settings.local_data_dir),
+            upload_to_gcs=True,
+            load_to_bigquery=True,
+            page_size=max(page_size, 10_000),
+        )
+        total_rows += result.row_count
+        print(f"311_date={day.isoformat()} rows={result.row_count}", flush=True)
+        day += dt.timedelta(days=1)
+    print(f"311_total_rows={total_rows}", flush=True)
+
+
 def main() -> None:
     args = parse_args()
     today = dt.datetime.now(dt.UTC).date()
@@ -91,6 +126,7 @@ def main() -> None:
         else today - dt.timedelta(days=1)
     )
     end_date = dt.date.fromisoformat(args.end_date) if args.end_date else today
+    street_signal_start = min(start_date, today - dt.timedelta(days=args.street_signal_days))
 
     if not args.skip_ingestion:
         result = run_nypd_complaints_etl(
@@ -106,6 +142,13 @@ def main() -> None:
         print(f"ingested_rows={result.row_count}")
         print(f"gcs_uri={result.gcs_uri or ''}")
         print(f"bigquery_table={result.bigquery_table or ''}")
+
+    if not args.skip_311:
+        run_311_street_signal_partitions(
+            street_signal_start,
+            end_date,
+            page_size=args.page_size,
+        )
 
     if not args.skip_dbt:
         run_dbt_models()
