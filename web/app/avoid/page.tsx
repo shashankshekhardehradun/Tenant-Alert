@@ -119,7 +119,6 @@ export default async function AvoidPage() {
         <Link className="nav-link" href="/map">The Map Room</Link>
         <Link className="nav-link" href="/risk">Risk Receipt</Link>
         <Link className="nav-link" href="/avoid">I Would Avoid</Link>
-        <Link className="nav-link" href="/boroughs/manhattan">Borough Files</Link>
       </nav>
       <LiveNewsTicker fallbackItems={[
         "Not every bad idea is a crime.",
