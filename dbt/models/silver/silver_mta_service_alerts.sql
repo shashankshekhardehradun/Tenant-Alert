@@ -26,9 +26,9 @@ with base as (
 expanded as (
     select
       *,
-      trim(route_id) as route_id
+      trim(raw_route_id) as route_id
     from base,
-    unnest(split(coalesce(route_ids, ''), ',')) as route_id
+    unnest(split(coalesce(route_ids, ''), ',')) as raw_route_id
 ),
 
 route_borough_map as (
