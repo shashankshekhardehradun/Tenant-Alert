@@ -83,7 +83,7 @@ street_rollup as (
           latest_example.incident_zip as incident_zip
         )
         order by category_score desc, latest_count desc
-      )[offset(0)] as top_signal
+      ) as signal_options
     from street_scored
     group by borough
 ),
@@ -158,7 +158,21 @@ combined as (
       coalesce(transit.transit_chaos_score, 0) as transit_chaos_score,
       coalesce(transit.transit_alert_count, 0) as transit_alert_count,
       coalesce(transit.affected_route_count, 0) as affected_route_count,
-      street.top_signal,
+      street.signal_options[
+        safe_offset(
+          mod(
+            case coalesce(street.borough, crime.borough, transit.borough)
+              when 'BROOKLYN' then 0
+              when 'MANHATTAN' then 1
+              when 'QUEENS' then 2
+              when 'BRONX' then 3
+              when 'STATEN ISLAND' then 4
+              else 0
+            end,
+            coalesce(array_length(street.signal_options), 1)
+          )
+        )
+      ] as top_signal,
       transit.top_transit_alert,
       (select max_signal_day from signal_bounds) as latest_signal_day,
       crime.latest_crime_day,

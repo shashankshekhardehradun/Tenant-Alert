@@ -1420,12 +1420,14 @@ select {
 .avoid-card-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
 }
 
 .avoid-card {
   display: grid;
   gap: 0.65rem;
+  min-width: 0;
+  overflow: hidden;
   padding: 1rem;
 }
 
@@ -1447,9 +1449,11 @@ select {
 }
 
 .avoid-card h2 {
-  font-size: clamp(2rem, 5vw, 4rem);
+  font-size: clamp(2.15rem, 4.2vw, 3.45rem);
+  letter-spacing: -0.03em;
   line-height: 0.95;
   margin: 0;
+  overflow-wrap: anywhere;
   text-transform: uppercase;
 }
 
@@ -1477,12 +1481,13 @@ select {
 .avoid-stat-grid {
   display: grid;
   gap: 0.55rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
 }
 
 .avoid-stat-grid div {
   border: 2px dashed rgba(23, 17, 13, 0.45);
   background: rgba(255, 255, 255, 0.22);
+  min-width: 0;
   padding: 0.5rem;
 }
 
@@ -1498,8 +1503,13 @@ select {
 .avoid-stat-grid strong {
   display: block;
   font-family: var(--font-headline), Impact, "Arial Narrow", sans-serif;
-  font-size: 1.65rem;
+  font-size: clamp(1.25rem, 3vw, 1.65rem);
   line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.avoid-card .classified-item {
+  overflow-wrap: anywhere;
 }
 
 .avoid-explainer {
