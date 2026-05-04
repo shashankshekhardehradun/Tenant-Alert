@@ -197,12 +197,6 @@ export default async function AvoidPage() {
             and lets daily 311 street signals provide freshness: noise, parking chaos, dark lights,
             grime, street conditions, and public-space calls.
           </p>
-          <div className="avoid-receipt">
-            <p><span>Historical pressure</span><strong>existing gold crime mart</strong></p>
-            <p><span>Street signal score</span><strong>daily 311 ETL</strong></p>
-            <p><span>Transit chaos</span><strong>MTA subway + bus alert JSON</strong></p>
-            <p><span>LLM magic</span><strong>none, just templates</strong></p>
-          </div>
         </section>
       </div>
     </main>
