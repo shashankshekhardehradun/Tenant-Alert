@@ -1,68 +1,129 @@
 # NYC Roulette
 
-NYC Roulette is a crime intelligence and urban analytics platform built on public NYC data. It combines NYPD complaint records, Census ACS demographics, NYC geography mappings, and the original 311 tenant-alert data backbone into an end-to-end data product with ETL, warehouse modeling, API serving, and a portfolio-focused frontend.
+NYC Roulette is a crime intelligence and urban analytics platform built on public NYC data. It combines NYPD complaint records, Census ACS demographics, NYC geography mappings, 311 street signals, MTA service alerts, and the original 311 tenant-alert backbone into an end-to-end data product: **extract → lake → warehouse → models → API → web**.
 
-The current product direction is an interactive crime analytics dashboard:
+The product surfaces an interactive crime analytics experience—charts, maps, avoidability views, and demographic context—backed by a **medallion-style BigQuery** warehouse and **BigQuery ML** for risk scoring.
 
-- Graphs page with borough, offense, severity, time-density, and socioeconomic views.
-- Map page with Google Maps, deck.gl 3D crime-density columns, heat mode, incident points, Street View links, and NYC Open Data source links.
-- BigQuery medallion warehouse with raw, cleaned, and analytics-ready marts.
-- FastAPI service exposing crime, demographic, and legacy tenant analytics.
-- Next.js frontend designed for a visually strong first impression.
+## Data engineering & data science highlights
 
-The older "Tenant Alert" 311 pipeline remains in the repo as a supporting data source and extensibility example.
+- **Medallion warehouse on BigQuery:** `bronze` (raw loads), `silver` (cleaned, conformed events), `gold` (facts, aggregates, demographics marts), `ml` (features, models, predictions). Terraform provisions datasets and IAM-aligned service accounts.
+- **NYPD crime ETL:** Python pulls NYC Open Data historic (`qgea-i56i`) and YTD (`5uac-w243`) complaints via Socrata; normalized parquet can land locally, in **GCS**, and append/replace windows in **BigQuery bronze** before dbt takes over.
+- **dbt as the transformation layer:** Builds `silver_crime_events`, `gold_fct_crime_events`, borough/day/hour aggregates, offense rollups, and **`gold_agg_demographics_by_nta`** (tract → NTA rollups joined to crime). Also **311 street-signal** silver models and **gold avoidability** outputs for the “I Would Avoid” experience.
+- **Scheduled production refresh:** A **Cloud Run Job** runs daily (triggered by **Cloud Scheduler**): NYPD YTD ingest, rolling **311** partitions for late-arriving street signals, **MTA** service-alerts ingest, then **dbt build/run** for crime + avoidability graphs, **BQML** `train_crime_risk_rf_model`, **feature importance**, and **`predictions_crime_risk_latest`** refresh.
+- **BigQuery ML (crime risk):** Hourly feature table → **random forest regressor** trained in BigQuery → predictions and explainability-style feature importance exposed downstream (see `docs/deployment.md` §6 for local backfill patterns).
+- **Legacy / parallel analytics:** 311 complaint marts (`gold_fct_complaints`, etc.) and resolution-time ML scaffolding (`ml.features_resolution_time`, `ml.predictions_resolution_time`) remain available for tenant-focused workflows.
+- **Quality & observability hooks:** Socrata app token and Census API key wired for ingestion; optional Soda/Dagster paths documented in-repo for deeper pipeline ops.
 
-## Feature Highlights
+## Systems used
 
-- **Immersive crime map:** Google Maps JavaScript API, optional custom Map ID, deck.gl `HexagonLayer`, `HeatmapLayer`, and severity-colored incident overlays.
-- **Crime graphs:** borough totals, daily trend with offense breakdown on hover, severity mix, top offenses, and weekday/hour density grid.
-- **Demographic context:** borough-level poverty rate, renter share, education share, income, rent, and crime rate per 100k residents.
-- **Rotatable 3D visual:** Plotly WebGL socioeconomic crime-space view.
-- **Source traceability:** incident popups link to Google Maps, Street View, and the underlying NYC Open Data complaint record.
-- **Data engineering backbone:** Socrata ingestion, local parquet landing, optional GCS upload, BigQuery bronze loads, dbt silver/gold models, and API-backed visualization.
+| Layer | Technology |
+| --- | --- |
+| **Cloud** | Google Cloud Platform |
+| **IaC** | Terraform (`infra/`) — APIs, buckets, Artifact Registry, BigQuery datasets, Cloud Run (API + web), Cloud Run Job, Scheduler, IAM |
+| **Raw storage** | GCS buckets (raw + artifacts) |
+| **Warehouse** | BigQuery (US), datasets: `bronze`, `silver`, `gold`, `ml` |
+| **Transform** | dbt (BigQuery adapter), models under `dbt/` |
+| **Orchestration (prod)** | Cloud Scheduler → Cloud Run Job (`scripts/daily_crime_refresh.py`) |
+| **Orchestration (optional)** | Dagster (`dagster_project/`) for local/partitioned asset graphs |
+| **Serving** | FastAPI (`api/`) on Cloud Run; BigQuery client for analytics routes |
+| **Frontend** | Next.js App Router (`web/`), Recharts, Plotly, Google Maps JS API, deck.gl |
+| **Containers** | Docker — `Dockerfile.api`, `Dockerfile.worker`, `web/Dockerfile`; images in **Artifact Registry** |
+| **Secrets / config** | Env vars + Terraform-injected service config; see `docs/secrets.md` |
 
-## Architecture
+## Architecture (GCP & data flow)
 
-- Ingestion: Python jobs pull NYC Open Data and Census API data into parquet and BigQuery.
-- Warehouse: BigQuery datasets (`bronze`, `silver`, `gold`, `ml`) follow a medallion-style layout.
-- Modeling: dbt cleans raw records, normalizes time/location fields, filters invalid geocodes, and builds analytics marts.
-- API: FastAPI routes query BigQuery and return compact dashboard payloads.
-- Web: Next.js App Router, Recharts, Plotly, Google Maps JavaScript API, and deck.gl.
-- Orchestration: Dagster scaffolding for scheduled ingestion/dbt workflows.
-- ML: BigQuery ML resolution-time model scaffold from the original tenant-alert direction.
+High-level flow: **public datasets → ingestion (Python) → GCS + BigQuery bronze → dbt (silver/gold/ml) → FastAPI → Next.js**. Production runs the same path inside the **worker** container on a schedule; the **API** and **web** services are stateless and read BigQuery (and cache where applicable).
+
+```mermaid
+flowchart TB
+  subgraph sources [Public data]
+    NYPD[NYC Open Data NYPD]
+    D311[NYC 311 Socrata]
+    ACS[Census ACS API]
+    GEO[NYC tract to NTA]
+    MTA[MTA GTFS alerts]
+  end
+
+  subgraph ingest [Ingestion]
+    PY[Python ETL in repo]
+  end
+
+  subgraph gcp [GCP]
+    GCS[GCS raw bucket]
+    BQ_B[BigQuery bronze]
+    BQ_S[BigQuery silver]
+    BQ_G[BigQuery gold]
+    BQ_M[BigQuery ml]
+    AR[Artifact Registry]
+    CR_API[Cloud Run API]
+    CR_WEB[Cloud Run Web]
+    JOB[Cloud Run Job]
+    SCH[Cloud Scheduler]
+  end
+
+  subgraph transform [Modeling]
+    DBT[dbt build and run]
+    BQML[BQML train and predict]
+  end
+
+  NYPD --> PY
+  D311 --> PY
+  ACS --> PY
+  GEO --> PY
+  MTA --> PY
+  PY --> GCS --> BQ_B
+  BQ_B --> DBT --> BQ_S --> BQ_G
+  BQ_G --> BQML --> BQ_M
+  BQ_G --> CR_API
+  CR_API --> CR_WEB
+  SCH --> JOB
+  JOB --> PY
+  JOB --> DBT
+  JOB --> BQML
+  AR --> CR_API
+  AR --> CR_WEB
+  AR --> JOB
+```
+
+Deploying or updating services: build and push **three** images (API, worker, web), then `terraform apply` with `api_image`, `worker_image`, and `web_image` (see **`docs/deployment.md`**).
+
+## Product / feature highlights
+
+- **Crime map:** Google Maps, optional Map ID, deck.gl layers, incident detail, Street View and NYC Open Data links.
+- **Graphs:** Borough leaderboard, daily trend, severity mix, weekday/hour density, socioeconomic lens (including scatter and magazine layout), filing-mix **pie** view, and related metric cards.
+- **Avoidability / street signals:** 311-derived signals and rankings (see gold avoidability models and dedicated web routes).
+- **Demographic context:** Borough-level poverty, renter share, education, income, rent, and crime rate per 100k from `gold_agg_demographics_by_nta`.
+- **Source traceability:** Popups and copy tie visuals back to NYPD and city open data.
 
 ## Repository layout
 
-- `infra/` Terraform for GCP foundations.
-- `ingestion/` Source extract and normalization code.
-- `dagster_project/` Dagster assets, jobs, schedules.
-- `dbt/` Warehouse transformations and feature models.
-- `api/` FastAPI routes for analytics endpoints.
-- `web/` Next.js frontend.
-- `ml/` BigQuery ML SQL scripts.
-- `docs/` data-source, secrets, table inventory, and methodology notes.
+- `infra/` — Terraform for GCP foundations and Cloud Run.
+- `ingestion/` — Source extract, normalization, GCS/BQ load helpers.
+- `dagster_project/` — Dagster assets, jobs, schedules (optional local/CI orchestration).
+- `dbt/` — Warehouse transformations, BQML model definitions, feature tables.
+- `api/` — FastAPI application and BigQuery-backed routes.
+- `web/` — Next.js frontend.
+- `scripts/` — Production worker entrypoints (e.g. daily refresh).
+- `ml/` — Supplemental BigQuery ML SQL where not fully captured in dbt.
+- `docs/` — Data sources, secrets, table inventory, deployment runbook, methodology.
 
-## Current Data Sources
+## Current data sources
 
-- **NYPD complaints:** historic dataset `qgea-i56i` and year-to-date dataset `5uac-w243`.
-- **NYC 311 complaints:** tenant/housing complaint analytics and extensibility backbone.
-- **Census ACS 5-year:** tract-level income, rent, poverty, race/ethnicity, tenure, and education features.
-- **NYC tract-to-NTA equivalency:** geography bridge from Census tracts to neighborhood tabulation areas.
+- **NYPD complaints:** historic `qgea-i56i`, YTD `5uac-w243`.
+- **NYC 311 complaints:** tenant/housing analytics, street-signal / avoidability paths.
+- **Census ACS 5-year:** tract-level income, rent, poverty, race/ethnicity, tenure, education.
+- **NYC tract-to-NTA equivalency:** bridge from tracts to neighborhood tabulation areas.
+- **MTA:** service alerts feed used in the scheduled worker pipeline.
 
-## Key BigQuery Tables
+## Key BigQuery tables
 
-- `bronze.raw_nypd_complaints`
-- `silver.silver_crime_events`
-- `gold.gold_fct_crime_events`
-- `gold.agg_crime_by_borough_day`
-- `gold.agg_crime_by_hour`
-- `gold.agg_crime_offense_rankings`
+- `bronze.raw_nypd_complaints`, `silver.silver_crime_events`, `gold.gold_fct_crime_events`
+- `gold.agg_crime_by_borough_day`, `gold.agg_crime_by_hour`, `gold.agg_crime_offense_rankings`
 - `gold.gold_agg_demographics_by_nta`
-- `bronze.raw_311_complaints`
-- `silver.silver_complaints`
-- `gold.gold_fct_complaints`
+- `bronze.raw_311_complaints`, `silver.silver_complaints`, `gold.gold_fct_complaints`
+- `ml` — crime risk features, model, predictions; resolution-time feature/prediction tables for legacy flows
 
-See `docs/bigquery_tables.md` for the broader table inventory and starter EDA queries.
+See **`docs/bigquery_tables.md`** for the full inventory and starter SQL.
 
 ## Local setup
 
@@ -94,13 +155,12 @@ See `docs/bigquery_tables.md` for the broader table inventory and starter EDA qu
 
 ## Deploy to GCP
 
-Use `docs/deployment.md` for the production runbook. The current deployment path uses:
+Use **`docs/deployment.md`** for the full runbook. Summary:
 
-- Cloud Run service for FastAPI.
-- Cloud Run service for Next.js.
-- Cloud Run Job for daily NYPD ingestion, dbt mart rebuilds, BQML retraining, feature importance, and latest predictions.
-- Cloud Scheduler to run the refresh job every morning.
-- Artifact Registry for API, worker, and web containers.
+- **Cloud Run** services for FastAPI and Next.js.
+- **Cloud Run Job** for daily NYPD ingest, 311 partitions, MTA ingest, dbt builds, BQML retrain, predictions, and avoidability-related models.
+- **Cloud Scheduler** triggers the job (default: morning America/New_York).
+- **Artifact Registry** stores API, worker, and web container images (push all three, then `terraform apply` with image variables set).
 
 ## Run API locally
 
@@ -116,28 +176,27 @@ npm install
 npm run dev
 ```
 
-The frontend calls the FastAPI service through `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). If you see connection errors, confirm the API is listening on the same host/port.
+The frontend calls FastAPI via `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). If you see connection errors, confirm the API is listening on the same host/port.
 
-Routes:
+Routes (among others):
 
-- `/graphs` crime charts and socioeconomic visuals.
-- `/map` immersive Google/deck.gl crime map.
-- `/` redirects to `/graphs`.
+- `/graphs` — crime charts and socioeconomic visuals.
+- `/map` — Google Maps / deck.gl crime map.
+- `/avoid` — avoidability / street-signal rankings.
+- `/` — redirects to `/graphs`.
 
-For the immersive crime map, enable Google Maps Platform's **Maps JavaScript API**, create a browser-restricted API key, and add it to `.env`:
+For the map, enable **Maps JavaScript API**, create a browser-restricted key, and set in `.env`:
 
 ```env
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-browser-restricted-google-maps-api-key
 NEXT_PUBLIC_GOOGLE_MAP_ID=your-optional-google-vector-map-id
 ```
 
-Restrict the browser key to your local and deployed web origins. A Google Maps Map ID is optional, but recommended for a custom cinematic/vector map style with tilt and rotation.
-
-The web app runs from `web/`, but `web/next.config.js` loads `NEXT_PUBLIC_` values from the repo-root `.env`, so you do not need to duplicate frontend env vars into `web/.env.local`.
+Restrict the key to your local and deployed web origins. `web/next.config.js` loads `NEXT_PUBLIC_*` from the repo-root `.env`.
 
 ## Ingest NYPD crime data
 
-Historic NYPD complaints use NYC Open Data dataset `qgea-i56i`; current YTD uses `5uac-w243`.
+Historic NYPD complaints use `qgea-i56i`; current YTD uses `5uac-w243`.
 
 Small smoke test without touching GCP:
 
@@ -151,10 +210,10 @@ Load a date window to GCS and BigQuery:
 python -m ingestion.crime.cli --source historic --start-date 2024-01-01 --end-date 2024-02-01 --upload-to-gcs --load-to-bigquery
 ```
 
-Then rebuild dbt:
+Then rebuild dbt (set `GCP_PROJECT_ID` to your project):
 
 ```powershell
-$env:GCP_PROJECT_ID='tenant-alert-494522'
+$env:GCP_PROJECT_ID = 'YOUR_GCP_PROJECT_ID'
 dbt build --project-dir D:\Tenant-Alert\dbt --profiles-dir D:\Tenant-Alert\dbt --select silver_crime_events+
 ```
 
@@ -181,11 +240,11 @@ python -m ingestion.geography.cli --dataset tract-nta --upload-to-gcs --load-to-
 Then rebuild dbt:
 
 ```powershell
-$env:GCP_PROJECT_ID='tenant-alert-494522'
+$env:GCP_PROJECT_ID = 'YOUR_GCP_PROJECT_ID'
 dbt build --project-dir D:\Tenant-Alert\dbt --profiles-dir D:\Tenant-Alert\dbt --select silver_census_acs_tract+ silver_tract_nta_equivalency+
 ```
 
-The dashboard/API can then read `gold.gold_agg_demographics_by_nta` for socioeconomic crime context.
+The dashboard/API can then read `gold.gold_agg_demographics_by_nta` for socioeconomic context.
 
 ## Legacy 311 Tenant Pipeline
 
@@ -212,15 +271,15 @@ cd dbt
 dbt build
 ```
 
-See `dbt/README.md` for details. The FastAPI analytics endpoints can still serve the original 311 complaint marts when available (`ANALYTICS_USE_GOLD=true`).
+See **`dbt/README.md`**. FastAPI can serve 311 gold marts when available (`ANALYTICS_USE_GOLD=true` in deployed env).
 
-For Dagster, open the UI and materialize the `nyc311_raw_partition` asset. Local runs use `ETL_UPLOAD_TO_GCS=false` and `ETL_LOAD_TO_BIGQUERY=false` unless you opt into GCP in `.env`.
+For Dagster, open the UI and materialize assets as needed. Local runs often use `ETL_UPLOAD_TO_GCS=false` and `ETL_LOAD_TO_BIGQUERY=false` unless you opt into GCP in `.env`.
 
 ## Security Notes
 
-- Keep `.env` and Google service-account files out of git.
+- Keep `.env`, `.conf`, and Google service-account files out of git.
 - Use browser restrictions on `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
-- Restrict the Google Maps key to the Maps JavaScript API.
+- Restrict the Maps key to the Maps JavaScript API.
 - Use `scripts/check_secrets.py` before committing sensitive changes.
 
 ## Product Roadmap
