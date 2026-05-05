@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
-import { GoogleMapsOverlay } from "@deck.gl/google-maps";
+import type { Layer } from "@deck.gl/core";
 import { ScatterplotLayer, TextLayer } from "@deck.gl/layers";
+import { GoogleMapsOverlay } from "@deck.gl/google-maps";
+import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 
 type CrimeMapPoint = {
   complaint_id: string;
@@ -17,15 +18,8 @@ type CrimeMapPoint = {
   longitude: number;
 };
 
-type ViewMode = "density" | "incidents";
 type HoverInfo = { x: number; y: number; point: CrimeMapPoint } | null;
 type OffenseGroup = "ROBBERY" | "THEFT" | "FORGERY" | "ASSAULT" | "DRUGS" | "OTHER";
-
-const LAW_CATEGORY_COLORS: Record<string, [number, number, number]> = {
-  FELONY: [180, 35, 24],
-  MISDEMEANOR: [247, 144, 9],
-  VIOLATION: [21, 112, 239],
-};
 
 const ALL_SEVERITIES = ["FELONY", "MISDEMEANOR", "VIOLATION"];
 
@@ -140,10 +134,6 @@ function streetViewUrl(point: CrimeMapPoint) {
   return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point.latitude},${point.longitude}`;
 }
 
-function colorForSeverity(category: string): [number, number, number] {
-  return LAW_CATEGORY_COLORS[category?.toUpperCase()] ?? [102, 112, 133];
-}
-
 function formatCategory(category: string) {
   return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
 }
@@ -183,7 +173,7 @@ export function CrimeMap({
   const overlayRef = useRef<GoogleMapsOverlay | null>(null);
   const boroughPolygonsRef = useRef<google.maps.Polygon[]>([]);
   const [enabledSeverities, setEnabledSeverities] = useState(() => new Set(ALL_SEVERITIES));
-  const [viewMode, setViewMode] = useState<ViewMode>("density");
+  const [layerPanelOpen, setLayerPanelOpen] = useState(true);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
   const [selectedPoint, setSelectedPoint] = useState<CrimeMapPoint | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -293,36 +283,8 @@ export function CrimeMap({
       return;
     }
 
-    const layers = [];
-    if (viewMode === "density") {
-      layers.push(
-        new ScatterplotLayer<CrimeMapPoint>({
-          id: "crime-severity-density",
-          data: filteredPoints,
-          getPosition: (point) => [point.longitude, point.latitude],
-          getFillColor: (point) => [...colorForSeverity(point.law_category), 82],
-          getLineColor: (point) => [...colorForSeverity(point.law_category), 220],
-          getLineWidth: 2,
-          getRadius: (point) => (point.law_category === "FELONY" ? 165 : point.law_category === "MISDEMEANOR" ? 125 : 92),
-          radiusUnits: "meters",
-          pickable: true,
-          stroked: true,
-          filled: true,
-          onHover: (info) => {
-            setHoverInfo(info.object ? { x: info.x, y: info.y, point: info.object } : null);
-          },
-          onClick: (info) => {
-            if (info.object) {
-              setSelectedPoint(info.object);
-            }
-          },
-        }),
-      );
-    }
-
-    if (viewMode === "incidents" || viewMode === "density") {
-      layers.push(
-        new ScatterplotLayer<CrimeMapPoint>({
+    const layers: Layer[] = [
+      new ScatterplotLayer<CrimeMapPoint>({
           id: "crime-neon-halos",
           data: filteredPoints,
           getPosition: (point) => [point.longitude, point.latitude],
@@ -380,8 +342,7 @@ export function CrimeMap({
           pickable: false,
           sizeUnits: "pixels",
         }),
-      );
-    }
+    ];
 
     layers.push(
       new TextLayer<(typeof BOROUGH_LABELS)[number]>({
@@ -403,7 +364,7 @@ export function CrimeMap({
     );
 
     overlayRef.current.setProps({ layers });
-  }, [filteredPoints, viewMode]);
+  }, [filteredPoints]);
 
   const toggleSeverity = (severity: string) => {
     setEnabledSeverities((current) => {
@@ -446,48 +407,59 @@ export function CrimeMap({
         }}
       >
         <div ref={containerRef} style={{ height: "100%", width: "100%" }} />
-        <aside className="map-control-panel">
-          {boroughFilter ? (
-            <p className="map-borough-focus" style={{ margin: "0 0 0.5rem", fontSize: "0.82rem" }}>
-              Showing <strong>{boroughFilter}</strong> from URL.{" "}
-              <a href="/map" style={{ color: "inherit", fontWeight: 700 }}>
-                Clear filter
-              </a>
-            </p>
-          ) : null}
-          <p className="map-panel-kicker">Layer Control</p>
-          {ALL_SEVERITIES.map((severity) => (
-            <label key={severity} className="map-check-row">
-              <input
-                checked={enabledSeverities.has(severity)}
-                onChange={() => toggleSeverity(severity)}
-                type="checkbox"
-              />
-              <span>{formatCategory(severity)}</span>
-            </label>
-          ))}
-          <p className="map-panel-kicker">Map View</p>
-          {(["density", "incidents"] as const).map((mode) => (
-            <button
-              className={viewMode === mode ? "map-pill active" : "map-pill"}
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              type="button"
-            >
-              {mode === "density" ? "Severity Density" : "Neon Incidents"}
+        {layerPanelOpen ? (
+          <aside className="map-control-panel">
+            <div className="map-control-panel-header">
+              <p className="map-panel-kicker map-panel-kicker--inline">Layer Control</p>
+              <button
+                aria-label="Close layer panel"
+                className="map-panel-close"
+                onClick={() => setLayerPanelOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            {boroughFilter ? (
+              <p className="map-borough-focus" style={{ margin: "0 0 0.5rem", fontSize: "0.82rem" }}>
+                Showing <strong>{boroughFilter}</strong> from URL.{" "}
+                <a href="/map" style={{ color: "inherit", fontWeight: 700 }}>
+                  Clear filter
+                </a>
+              </p>
+            ) : null}
+            {ALL_SEVERITIES.map((severity) => (
+              <label key={severity} className="map-check-row">
+                <input
+                  checked={enabledSeverities.has(severity)}
+                  onChange={() => toggleSeverity(severity)}
+                  type="checkbox"
+                />
+                <span>{formatCategory(severity)}</span>
+              </label>
+            ))}
+            <p className="map-panel-kicker">Camera</p>
+            <button className="map-pill" onClick={resetCamera} type="button">
+              Reset NYC
             </button>
-          ))}
-          <p className="map-panel-kicker">Camera</p>
-          <button className="map-pill" onClick={resetCamera} type="button">Reset NYC</button>
-        </aside>
+          </aside>
+        ) : (
+          <button
+            className="map-control-reopen"
+            onClick={() => setLayerPanelOpen(true)}
+            type="button"
+          >
+            Filters
+          </button>
+        )}
         <aside className="map-stat-stack">
           <div>
             <span>Incidents Live</span>
             <strong>{filteredPoints.length.toLocaleString()}</strong>
           </div>
           <div>
-            <span>Hot Layer</span>
-            <strong>{viewMode === "density" ? "DENSITY" : "PINS"}</strong>
+            <span>Map mode</span>
+            <strong>NEON</strong>
           </div>
           <div>
             <span>Top Type</span>
@@ -498,11 +470,6 @@ export function CrimeMap({
             <strong>{felonyCount.toLocaleString()}</strong>
           </div>
         </aside>
-        <div className="map-risk-legend">
-          <span><i style={{ background: "rgb(180, 35, 24)" }} /> Felony Density</span>
-          <span><i style={{ background: "rgb(247, 144, 9)" }} /> Misdemeanor Density</span>
-          <span><i style={{ background: "rgb(21, 112, 239)" }} /> Violation Density</span>
-        </div>
         <div className="map-offense-legend">
           {Object.entries(OFFENSE_MARKERS).map(([key, marker]) => (
             <span key={key}>
@@ -572,7 +539,7 @@ export function CrimeMap({
               position: "absolute",
               right: 16,
               top: 16,
-              zIndex: 3,
+              zIndex: 10,
             }}
           >
             <button
@@ -581,7 +548,7 @@ export function CrimeMap({
               style={{ background: "transparent", border: 0, cursor: "pointer", float: "right", fontSize: 18 }}
               type="button"
             >
-              x
+              ×
             </button>
             <span className="stamp">Filed Incident</span>
             <h3 style={{ margin: "0.75rem 1.5rem 0.5rem 0" }}>{selectedPoint.offense_description}</h3>

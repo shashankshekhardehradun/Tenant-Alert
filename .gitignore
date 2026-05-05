@@ -13,6 +13,7 @@ build/
 node_modules/
 .next/
 .turbo/
+.conf
 
 # --- Secrets & credentials (never commit) ---
 .env

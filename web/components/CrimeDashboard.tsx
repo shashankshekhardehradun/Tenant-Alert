@@ -16,6 +16,8 @@ import {
   Cell,
   CartesianGrid,
   Legend,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Scatter,
   ScatterChart,
@@ -115,6 +117,107 @@ const DAY_LABELS: Record<number, string> = {
   7: "Sat",
 };
 
+const JUNK_OFFENSE_LABELS = new Set(["", "UNSPECIFIED", "NULL", "(NULL)", "UNKNOWN"]);
+
+function offenseLabelFromRow(row: TopOffenseRow): string {
+  const rec = row as unknown as Record<string, unknown>;
+  const v =
+    (typeof rec.offense_description === "string" ? rec.offense_description : null) ??
+    (typeof rec.offenseDescription === "string" ? rec.offenseDescription : null);
+  if (v == null) {
+    return "";
+  }
+  return String(v).trim();
+}
+
+type FilingPieSlice = {
+  key: string;
+  name: string;
+  crimes: number;
+  fill: string;
+};
+
+/** Borough shares first (clean pie); else law categories; else one window slice. */
+function buildFilingPieSlices(
+  rowCount: number,
+  lawRows: Array<{ category: string; crimes: number }>,
+  boroughRows: Array<{ borough: string; crimes: number }>,
+): FilingPieSlice[] {
+  const boroPositive = boroughRows.filter((b) => Number(b.crimes) > 0);
+  if (boroPositive.length > 0) {
+    return [...boroPositive]
+      .sort((a, b) => b.crimes - a.crimes)
+      .map((b) => {
+        const u = b.borough.toUpperCase();
+        return {
+          key: `boro-${u}`,
+          name: u === "STATEN ISLAND" ? "Staten Island" : b.borough,
+          crimes: b.crimes,
+          fill: BOROUGH_COLORS[u] ?? "#667085",
+        };
+      });
+  }
+  const lawPositive = lawRows
+    .map((row) => ({
+      category: (row.category ?? "").trim(),
+      crimes: Number(row.crimes ?? 0),
+    }))
+    .filter((row) => row.category.length > 0 && row.crimes > 0);
+  if (lawPositive.length > 0) {
+    return [...lawPositive]
+      .sort((a, b) => b.crimes - a.crimes)
+      .map((row) => {
+        const u = row.category.toUpperCase();
+        return {
+          key: `law-${u}`,
+          name: row.category,
+          crimes: row.crimes,
+          fill: LAW_CATEGORY_COLORS[u] ?? "#667085",
+        };
+      });
+  }
+  if (rowCount > 0) {
+    return [{ key: "window", name: "All events", crimes: rowCount, fill: "#b33124" }];
+  }
+  return [];
+}
+
+function pickFeaturedTopOffense(overview: CrimeOverviewPayload): TopOffenseRow | undefined {
+  const ranked = [...(overview.top_offenses ?? [])].sort(
+    (a, b) => Number(b.crime_count ?? 0) - Number(a.crime_count ?? 0),
+  );
+  for (const row of ranked) {
+    const label = offenseLabelFromRow(row).trim();
+    if (label.length > 0 && !JUNK_OFFENSE_LABELS.has(label.toUpperCase())) {
+      return row;
+    }
+  }
+  return undefined;
+}
+
+function leadLineForMetrics(
+  overview: CrimeOverviewPayload,
+  boroughRows: Array<{ borough: string; crimes: number }>,
+  lawRows: Array<{ category: string; crimes: number }>,
+  featured: TopOffenseRow | undefined,
+): { label: string; count: number | undefined } {
+  if (featured) {
+    return {
+      label: offenseLabelFromRow(featured) || "Lead offense",
+      count: Number(featured.crime_count ?? 0),
+    };
+  }
+  const topLaw = [...lawRows].sort((a, b) => b.crimes - a.crimes)[0];
+  if (topLaw) {
+    return { label: `${topLaw.category} (top law bucket)`, count: topLaw.crimes };
+  }
+  const topB = [...boroughRows].sort((a, b) => b.crimes - a.crimes)[0];
+  if (topB) {
+    return { label: `${topB.borough} filings`, count: topB.crimes };
+  }
+  return { label: "All events in window", count: overview.row_count };
+}
+
 const CARD_STYLE = {
   border: "3px solid #17110d",
   borderRadius: 0,
@@ -213,9 +316,10 @@ function EventLegend({
           <h4 style={{ margin: "0 0 0.5rem" }}>Borough colors</h4>
           <div style={{ display: "grid", gap: "0.35rem" }}>
             {Object.entries(BOROUGH_COLORS).map(([borough, color]) => (
-              <span key={borough} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span className="borough-swatch-row" key={borough} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <span
                   aria-hidden="true"
+                  className="borough-swatch-dot"
                   style={{ width: 12, height: 12, borderRadius: 999, background: color }}
                 />
                 {borough}
@@ -265,12 +369,16 @@ function MetricCards({
   rowCount,
   boroughs,
   topOffense,
+  leadOffenseLabel,
+  leadOffenseCount,
   density,
   demographics,
 }: {
   rowCount: number;
   boroughs: BoroughCrimeRow[];
   topOffense?: TopOffenseRow;
+  leadOffenseLabel: string;
+  leadOffenseCount?: number;
   density: HourlyDensityRow[];
   demographics: DemographicBoroughRow[];
 }) {
@@ -292,7 +400,11 @@ function MetricCards({
       value: highestRate?.borough ?? "n/a",
       detail: `${(highestRate?.crime_rate_per_100k ?? 0).toFixed(1)} reports per 100k`,
     },
-    { label: "Front-page offense", value: topOffense?.offense_description ?? "n/a", detail: `${formatCompact(topOffense?.crime_count)} mentions` },
+    {
+      label: "Front-page offense",
+      value: leadOffenseLabel,
+      detail: `${formatCompact(leadOffenseCount ?? topOffense?.crime_count)} mentions`,
+    },
     {
       label: "Most chaotic hour",
       value: peakCell ? `${DAY_LABELS[peakCell.day_of_week]} ${peakCell.hour}:00` : "n/a",
@@ -303,7 +415,7 @@ function MetricCards({
   return (
     <section style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
       {metrics.map((metric) => (
-        <div key={metric.label} className="paper-card metric-card">
+        <div key={metric.label} className="paper-card metric-card metric-card--tactile">
           <p className="metric-label">{metric.label}</p>
           <strong className="metric-value">{metric.value}</strong>
           <p className="metric-detail">{metric.detail}</p>
@@ -314,11 +426,12 @@ function MetricCards({
 }
 
 function HourlyDensityPlot({ rows }: { rows: HourlyDensityRow[] }) {
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
   const maxCount = Math.max(...rows.map((row) => row.crime_count), 1);
   const byKey = new Map(rows.map((row) => [`${row.day_of_week}-${row.hour}`, row.crime_count]));
 
   return (
-    <section style={CARD_STYLE}>
+    <section className="hourly-tactile-wrap" style={CARD_STYLE}>
       <span className="section-label">Night Watch</span>
       <h3 style={{ margin: "0.55rem 0 0.4rem" }}>Crime density by hour and weekday</h3>
       <p style={{ margin: "0 0 1rem", color: "#475467" }}>
@@ -340,15 +453,22 @@ function HourlyDensityPlot({ rows }: { rows: HourlyDensityRow[] }) {
               {Array.from({ length: 24 }, (_, hour) => {
                 const count = byKey.get(`${day}-${hour}`) ?? 0;
                 const intensity = count / maxCount;
+                const cellKey = `${day}-${hour}`;
+                const active = hoverKey === cellKey;
                 return (
                   <div
                     key={hour}
+                    className={`hourly-density-cell${active ? " hourly-density-cell--tactile" : ""}`}
                     title={`${label} ${hour}:00 - ${count.toLocaleString()} events`}
+                    onMouseEnter={() => setHoverKey(cellKey)}
+                    onMouseLeave={() => setHoverKey(null)}
                     style={{
                       height: 22,
                       borderRadius: 5,
                       background: `rgba(179, 49, 36, ${0.1 + intensity * 0.9})`,
-                      border: "1px solid rgba(23,17,13,0.25)",
+                      border: active ? "2px solid #17110d" : "1px solid rgba(23,17,13,0.25)",
+                      transform: active ? "translateY(-1px) scale(1.06)" : undefined,
+                      transition: "transform 0.12s ease, border 0.12s ease",
                     }}
                   />
                 );
@@ -362,6 +482,7 @@ function HourlyDensityPlot({ rows }: { rows: HourlyDensityRow[] }) {
 }
 
 function SocioeconomicScatter({ rows }: { rows: DemographicBoroughRow[] }) {
+  const [hoverBorough, setHoverBorough] = useState<string | null>(null);
   const data = rows
     .filter((row) => isValidBorough(row.borough))
     .map((row) => ({
@@ -373,7 +494,7 @@ function SocioeconomicScatter({ rows }: { rows: DemographicBoroughRow[] }) {
     }));
 
   return (
-    <section style={CARD_STYLE}>
+    <section className="scatter-tactile-wrap" style={CARD_STYLE}>
       <span className="section-label">Social & Economic Lens</span>
       <h3 style={{ margin: "0.55rem 0 0.4rem" }}>Crime rate vs economic context</h3>
       <p style={{ margin: "0 0 1rem", color: "#475467" }}>
@@ -382,7 +503,7 @@ function SocioeconomicScatter({ rows }: { rows: DemographicBoroughRow[] }) {
         rate because both numbers describe different parts of the income distribution. Bubble size
         reflects reported crimes per 100k residents in the selected window.
       </p>
-      <div style={{ width: "100%", height: 360 }}>
+      <div className="chart-window chart-window--tactile" style={{ width: "100%", height: 360 }}>
         <ResponsiveContainer>
           <ScatterChart margin={{ top: 20, right: 30, bottom: 35, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#eaecf0" />
@@ -404,9 +525,25 @@ function SocioeconomicScatter({ rows }: { rows: DemographicBoroughRow[] }) {
               }}
               cursor={{ strokeDasharray: "3 3" }}
             />
-            <Scatter name="Boroughs" data={data}>
+            <Scatter
+              data={data}
+              isAnimationActive={false}
+              name="Boroughs"
+              onMouseEnter={(next: unknown) => {
+                const row = next as { borough?: string };
+                if (row?.borough) {
+                  setHoverBorough(String(row.borough));
+                }
+              }}
+              onMouseLeave={() => setHoverBorough(null)}
+            >
               {data.map((row) => (
-                <Cell key={row.borough} fill={BOROUGH_COLORS[row.borough] ?? "#175cd3"} />
+                <Cell
+                  key={row.borough}
+                  fill={BOROUGH_COLORS[row.borough] ?? "#175cd3"}
+                  stroke={hoverBorough === row.borough ? "#17110d" : "transparent"}
+                  strokeWidth={hoverBorough === row.borough ? 2 : 0}
+                />
               ))}
             </Scatter>
           </ScatterChart>
@@ -451,7 +588,7 @@ function SocioeconomicMagazineLens({ rows }: { rows: DemographicBoroughRow[] }) 
           const rate = row.crime_rate_per_100k ?? 0;
           const poverty = row.poverty_rate ?? 0;
           return (
-            <article key={row.borough} className="lens-card">
+            <article key={row.borough} className="lens-card lens-card--tactile">
               <img
                 alt={`${row.borough} evidence illustration`}
                 src={BOROUGH_IMAGES[row.borough] ?? "/evidence/borough-map.svg"}
@@ -687,6 +824,11 @@ export function CrimeDashboard(props: {
   /** When set, Map Room filters to this uppercase borough (from `/map?borough=`). */
   mapFocusBorough?: string | null;
 }) {
+  const [boroughBarHover, setBoroughBarHover] = useState<number | null>(null);
+  const [lawBarHover, setLawBarHover] = useState<number | null>(null);
+  const [pieSliceHover, setPieSliceHover] = useState<number | null>(null);
+  const [trendTactile, setTrendTactile] = useState(false);
+
   if (props.error) {
     return <p style={{ color: "#b42318" }}>{props.error}</p>;
   }
@@ -724,25 +866,11 @@ export function CrimeDashboard(props: {
     crimes: row.crime_count,
     topOffenses: row.top_offenses ?? [],
   }));
-  const topOffensesMapped = (props.overview.top_offenses ?? [])
-    .filter((row) => (row.offense_description ?? "").trim().length > 0)
-    .map((row) => {
-      const label = row.offense_description ?? "";
-      return {
-        offense: label.length > 38 ? `${label.slice(0, 38)}...` : label,
-        crimes: row.crime_count,
-      };
-    });
-  const offenseData =
-    topOffensesMapped.length > 0
-      ? topOffensesMapped
-      : (props.overview.by_law_category ?? []).map((row) => ({
-          offense: row.law_category ? `${row.law_category} (severity mix)` : "Unknown category",
-          crimes: row.crime_count,
-        }));
+  const featuredTopOffense = pickFeaturedTopOffense(props.overview);
+  const leadLine = leadLineForMetrics(props.overview, boroughData, lawData, featuredTopOffense);
+  const pieSlices = buildFilingPieSlices(props.overview.row_count, lawData, boroughData);
   const mapPoints = (props.overview.map_points ?? []).filter((point) => isValidBorough(point.borough));
   const topBorough = boroughData[0];
-  const topOffense = props.overview.top_offenses[0];
   const peakHour = hourlyDensity.reduce<HourlyDensityRow | null>(
     (best, row) => (!best || row.crime_count > best.crime_count ? row : best),
     null,
@@ -779,7 +907,9 @@ export function CrimeDashboard(props: {
       <MetricCards
         rowCount={props.overview.row_count}
         boroughs={props.overview.by_borough.filter((row) => isValidBorough(row.borough))}
-        topOffense={props.overview.top_offenses[0]}
+        topOffense={featuredTopOffense}
+        leadOffenseLabel={leadLine.label}
+        leadOffenseCount={leadLine.count}
         density={hourlyDensity}
         demographics={demographics}
       />
@@ -788,7 +918,12 @@ export function CrimeDashboard(props: {
         <div>
         <span className="section-label">Borough Leaderboard</span>
         <h3 style={{ margin: "0.55rem 0 0.75rem" }}>All incidents, ranked by borough</h3>
-        <div className="chart-window" style={{ height: 320 }}>
+        <div
+          className={`chart-window chart-window--tactile${
+            boroughBarHover !== null ? " is-tactile-live" : ""
+          }`}
+          style={{ height: 320 }}
+        >
           <ResponsiveContainer>
             <BarChart data={boroughData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#cdb98b" />
@@ -796,9 +931,20 @@ export function CrimeDashboard(props: {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="crimes" name="Reported events" radius={[10, 10, 0, 0]}>
-                {boroughData.map((row) => (
-                  <Cell key={row.borough} fill={BOROUGH_COLORS[row.borough] ?? "#c4320a"} />
+              <Bar
+                dataKey="crimes"
+                name="Reported events"
+                radius={[10, 10, 0, 0]}
+                onMouseEnter={(_, i) => setBoroughBarHover(typeof i === "number" ? i : null)}
+                onMouseLeave={() => setBoroughBarHover(null)}
+              >
+                {boroughData.map((row, index) => (
+                  <Cell
+                    key={row.borough}
+                    fill={BOROUGH_COLORS[row.borough] ?? "#c4320a"}
+                    stroke={boroughBarHover === index ? "#17110d" : "transparent"}
+                    strokeWidth={boroughBarHover === index ? 2 : 0}
+                  />
                 ))}
               </Bar>
             </BarChart>
@@ -840,7 +986,14 @@ export function CrimeDashboard(props: {
         <div>
         <span className="section-label">Biggest Spike Watch</span>
         <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Daily reported crime trend</h3>
-        <div className="chart-window" style={{ height: 320 }}>
+        <div
+          className={`chart-window chart-window--tactile chart-window--tactile-area${
+            trendTactile ? " is-tactile-live" : ""
+          }`}
+          style={{ height: 320 }}
+          onMouseEnter={() => setTrendTactile(true)}
+          onMouseLeave={() => setTrendTactile(false)}
+        >
           <ResponsiveContainer>
             <AreaChart data={trendData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <defs>
@@ -855,11 +1008,13 @@ export function CrimeDashboard(props: {
               <Tooltip content={<DailyCrimeTooltip />} />
               <Legend />
               <Area
+                activeDot={{ r: 7, strokeWidth: 2, stroke: "#17110d", fill: "#f8edcf" }}
+                dot={{ r: 0 }}
                 type="monotone"
                 dataKey="crimes"
                 name="Reported events"
                 stroke="#17110d"
-                strokeWidth={2}
+                strokeWidth={trendTactile ? 3 : 2}
                 fill="url(#crimeTrend)"
               />
             </AreaChart>
@@ -874,7 +1029,12 @@ export function CrimeDashboard(props: {
         <p className="blotter-note">
           Not all trouble is built the same. Felonies, misdemeanors, and violations get their own ink.
         </p>
-        <div className="chart-window" style={{ height: 280 }}>
+        <div
+          className={`chart-window chart-window--tactile${
+            lawBarHover !== null ? " is-tactile-live" : ""
+          }`}
+          style={{ height: 280 }}
+        >
           <ResponsiveContainer>
             <BarChart data={lawData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#cdb98b" />
@@ -882,23 +1042,24 @@ export function CrimeDashboard(props: {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="crimes" name="Reported events" radius={[10, 10, 0, 0]}>
-                {lawData.map((row) => (
+              <Bar
+                dataKey="crimes"
+                name="Reported events"
+                radius={[10, 10, 0, 0]}
+                onMouseEnter={(_, i) => setLawBarHover(typeof i === "number" ? i : null)}
+                onMouseLeave={() => setLawBarHover(null)}
+              >
+                {lawData.map((row, index) => (
                   <Cell
                     key={row.category}
                     fill={LAW_CATEGORY_COLORS[row.category?.toUpperCase()] ?? "#667085"}
+                    stroke={lawBarHover === index ? "#17110d" : "transparent"}
+                    strokeWidth={lawBarHover === index ? 2 : 0}
                   />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
-        <div className="tear-tabs">
-          <span>Felony</span>
-          <span>Misdemeanor</span>
-          <span>Violation</span>
-          <span>Context</span>
-          <span>Source</span>
         </div>
       </section>
 
@@ -912,38 +1073,69 @@ export function CrimeDashboard(props: {
 
       <section className="paper-card news-feature">
         <div>
-        <span className="section-label">What's Hot</span>
-        <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Top reported offenses</h3>
-        <div className="chart-window offense-chart-wrap" style={{ height: 360 }}>
-          <div className="offense-chart-inner">
-            <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              layout="vertical"
-              data={offenseData}
-              margin={{ top: 10, right: 16, left: 8, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#cdb98b" />
-              <XAxis type="number" tick={{ fontSize: 10 }} />
-              <YAxis type="category" dataKey="offense" interval={0} tick={{ fontSize: 10 }} width={200} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="crimes" name="Reported events" fill="#1f5f8b" radius={[0, 6, 6, 0]} />
-            </BarChart>
-            </ResponsiveContainer>
+          <span className="section-label">Desk closing</span>
+          <h3 style={{ margin: "0.55rem 0 0.75rem" }}>Filing mix — pie view</h3>
+          <p style={{ margin: "0 0 0.75rem", color: "#475467", fontSize: 14 }}>
+            Blotter pastry shop: borough wedges when the paperwork names a neighborhood, law slices when the map
+            won’t name names, or one proud slab for the whole window when the detail line is just “everything we’ve
+            got.”
+          </p>
+          <div
+            className={`chart-window filing-pie-wrap chart-window--tactile${
+              pieSliceHover !== null ? " is-tactile-live" : ""
+            }`}
+            style={{ height: 360 }}
+          >
+            <div className="pie-chart-inner" style={{ width: "100%", height: "100%" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                  <Pie
+                    data={pieSlices}
+                    dataKey="crimes"
+                    nameKey="name"
+                    cx="42%"
+                    cy="50%"
+                    innerRadius={52}
+                    outerRadius={118}
+                    paddingAngle={1}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={{ stroke: "#5d3f22", strokeWidth: 1 }}
+                    onMouseEnter={(_, i) => setPieSliceHover(typeof i === "number" ? i : null)}
+                    onMouseLeave={() => setPieSliceHover(null)}
+                  >
+                    {pieSlices.map((slice, index) => (
+                      <Cell
+                        key={slice.key}
+                        fill={slice.fill}
+                        fillOpacity={pieSliceHover === null || pieSliceHover === index ? 1 : 0.55}
+                        stroke="#17110d"
+                        strokeWidth={pieSliceHover === index ? 3 : 1}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => value.toLocaleString()} />
+                  <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
         </div>
         <aside className="feature-copy">
           <span className="stamp">Blotter Pull</span>
-          <p className="mini-headline">{topOffense?.offense_description ?? "Top offense"} leads the column</p>
-          <p>
-            This is the ranked offense mix for the selected bulletin window. It gives the map and
-            risk calculator a punchier vocabulary than raw category codes.
+          <p className="mini-headline">
+            {featuredTopOffense
+              ? `${offenseLabelFromRow(featuredTopOffense)} still leads named offenses`
+              : `${leadLine.label} drives the headline when offense text is thin`}
           </p>
           <div className="feature-stat">
-            <span>Top offense count</span>
-            <strong>{formatCompact(topOffense?.crime_count)}</strong>
+            <span>Lead story filings</span>
+            <strong>{formatCompact(featuredTopOffense?.crime_count ?? leadLine.count)}</strong>
           </div>
+          <p style={{ margin: "0.65rem 0 0", color: "#6a5947", fontSize: 13, lineHeight: 1.45 }}>
+            That count is tied to the same “Front-page offense” metric up top: the busiest named charge when NYPD
+            text cooperates, otherwise the strongest law bucket, borough total, or whole-window tally we can
+            hang a headline on.
+          </p>
           {peakHour ? (
             <div className="classified-item">
               Peak hour cell: {DAY_LABELS[peakHour.day_of_week]} {peakHour.hour}:00,{" "}

@@ -529,22 +529,6 @@ select {
   margin: 0;
 }
 
-.tear-tabs {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  margin-top: 0.85rem;
-}
-
-.tear-tabs span {
-  border: 1px solid var(--ink);
-  border-top: 3px solid var(--ink);
-  font-family: Impact, "Arial Narrow", sans-serif;
-  font-size: 0.74rem;
-  padding: 0.25rem;
-  text-align: center;
-  text-transform: uppercase;
-}
-
 .case-board {
   position: relative;
   background:
@@ -614,12 +598,101 @@ select {
   padding: 0.65rem;
   position: relative;
   text-decoration: none;
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+/* Momentary lift only (original detective-wall feel) — no long keyframe shake. */
+.evidence-borough-card:hover {
+  box-shadow: 8px 9px 0 rgba(0, 0, 0, 0.26);
+  transform: translate(-3px, -3px);
+}
+
+@keyframes tactile-jiggle {
+  0%,
+  100% {
+    transform: translate(-2px, -2px) rotate(0deg);
+  }
+  25% {
+    transform: translate(-3px, -1px) rotate(-0.55deg);
+  }
+  50% {
+    transform: translate(-1px, -3px) rotate(0.45deg);
+  }
+  75% {
+    transform: translate(-3px, -3px) rotate(-0.35deg);
+  }
+}
+
+@keyframes tactile-stutter {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(-1px, 1px);
+  }
+  66% {
+    transform: translate(1px, -1px);
+  }
+}
+
+.chart-window--tactile .recharts-wrapper {
+  transition: filter 0.14s ease;
+}
+
+.chart-window--tactile.is-tactile-live .recharts-wrapper {
+  filter: drop-shadow(4px 5px 0 rgba(23, 17, 13, 0.14));
+}
+
+/* Avoid transform animations on Recharts <Cell> — they fight layout and make dots/bars jitter on hover. */
+.recharts-tactile-cell {
+  transform-origin: center;
+}
+
+.metric-card--tactile {
   transition: box-shadow 0.12s ease, transform 0.12s ease;
 }
 
-.evidence-borough-card:hover {
-  box-shadow: 8px 9px 0 rgba(0, 0, 0, 0.26);
+.metric-card--tactile:hover {
+  box-shadow: 10px 10px 0 rgba(23, 17, 13, 0.22);
   transform: translate(-2px, -2px);
+}
+
+.borough-swatch-row {
+  border-radius: 6px;
+  padding: 0.12rem 0.2rem;
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+
+.borough-swatch-row:hover {
+  background: rgba(255, 255, 255, 0.35);
+  transform: translate(-1px, 0);
+}
+
+.borough-swatch-dot {
+  transition: transform 0.1s ease, outline 0.1s ease;
+}
+
+.borough-swatch-row:hover .borough-swatch-dot {
+  outline: 2px solid #17110d;
+  transform: scale(1.06);
+}
+
+.lens-card--tactile {
+  transition: box-shadow 0.12s ease, transform 0.12s ease;
+}
+
+.lens-card--tactile:hover {
+  box-shadow: 9px 10px 0 rgba(23, 17, 13, 0.24);
+  transform: translate(-2px, -2px);
+}
+
+.scatter-tactile-wrap.is-tactile-live .chart-window--tactile {
+  filter: drop-shadow(3px 4px 0 rgba(23, 17, 13, 0.12));
+}
+
+.hourly-tactile-wrap.is-tactile-live {
+  filter: drop-shadow(2px 3px 0 rgba(23, 17, 13, 0.1));
 }
 
 .evidence-borough-card h3 {
@@ -1262,8 +1335,8 @@ select {
 }
 
 .map-control-panel,
+.map-control-reopen,
 .map-stat-stack,
-.map-risk-legend,
 .map-offense-legend,
 .map-headline-strip {
   position: absolute;
@@ -1279,6 +1352,64 @@ select {
   background: rgba(7, 9, 10, 0.78);
   box-shadow: 0 0 26px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   padding: 0.75rem;
+}
+
+.map-control-panel-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.35rem;
+  justify-content: space-between;
+  margin: -0.15rem 0 0.35rem;
+}
+
+.map-panel-kicker--inline {
+  border-bottom: 1px solid rgba(248, 237, 207, 0.2);
+  flex: 1;
+  margin: 0 !important;
+  min-width: 0;
+  padding-bottom: 0.25rem;
+}
+
+.map-panel-close {
+  background: rgba(255, 32, 110, 0.22);
+  border: 1px solid rgba(248, 237, 207, 0.4);
+  color: #ffdf7e;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-family: Impact, "Arial Narrow", sans-serif;
+  font-size: 1.35rem;
+  line-height: 1;
+  margin: 0;
+  min-height: 2rem;
+  min-width: 2rem;
+  padding: 0;
+}
+
+.map-panel-close:hover {
+  background: #ff206e;
+  border-color: #ffdf7e;
+  color: #080808;
+}
+
+.map-control-reopen {
+  background: rgba(7, 9, 10, 0.78);
+  border: 1px solid rgba(248, 237, 207, 0.34);
+  box-shadow: 0 0 26px rgba(0, 0, 0, 0.55);
+  color: #ffdf7e;
+  cursor: pointer;
+  font-family: Impact, "Arial Narrow", sans-serif;
+  font-size: 0.72rem;
+  left: 1rem;
+  letter-spacing: 0.12em;
+  padding: 0.5rem 0.75rem;
+  text-transform: uppercase;
+  top: 5.1rem;
+}
+
+.map-control-reopen:hover {
+  background: #ff206e;
+  border-color: #ffdf7e;
+  color: #080808;
 }
 
 .map-panel-kicker {
@@ -1366,28 +1497,18 @@ select {
   text-transform: uppercase;
 }
 
-.map-risk-legend,
 .map-offense-legend {
   border: 1px solid rgba(248, 237, 207, 0.35);
   background: rgba(7, 9, 10, 0.78);
+  bottom: 4.8rem;
   box-shadow: 0 0 26px rgba(0, 0, 0, 0.5);
   display: grid;
   gap: 0.35rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  left: 1rem;
   padding: 0.7rem;
 }
 
-.map-risk-legend {
-  bottom: 4.8rem;
-  right: 1rem;
-}
-
-.map-offense-legend {
-  bottom: 4.8rem;
-  left: 1rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.map-risk-legend span,
 .map-offense-legend span {
   align-items: center;
   color: rgba(248, 237, 207, 0.84);
@@ -1399,7 +1520,6 @@ select {
   text-transform: uppercase;
 }
 
-.map-risk-legend i,
 .map-offense-legend i {
   border: 1px solid rgba(248, 237, 207, 0.45);
   box-shadow: 0 0 12px currentColor;
@@ -1655,8 +1775,8 @@ select {
   }
 
   .map-control-panel,
+  .map-control-reopen,
   .map-stat-stack,
-  .map-risk-legend,
   .map-offense-legend {
     max-width: calc(100% - 2rem);
     position: absolute;
@@ -1845,7 +1965,7 @@ select {
     min-height: 260px;
   }
 
-  .offense-chart-inner {
+  .pie-chart-inner {
     min-width: 268px;
   }
 
