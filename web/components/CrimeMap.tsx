@@ -97,6 +97,15 @@ const BOROUGH_LABELS = [
   { name: "STATEN ISLAND", position: [-74.155, 40.585] as [number, number] },
 ];
 
+/** Map camera when deep-linking from Front Page detective wall (`/map?borough=…`). */
+const BOROUGH_FOCUS: Record<string, { lat: number; lng: number; zoom: number }> = {
+  MANHATTAN: { lat: 40.758, lng: -73.985, zoom: 11.4 },
+  BROOKLYN: { lat: 40.65, lng: -73.95, zoom: 10.9 },
+  QUEENS: { lat: 40.72, lng: -73.8, zoom: 10.6 },
+  BRONX: { lat: 40.85, lng: -73.88, zoom: 11.2 },
+  "STATEN ISLAND": { lat: 40.58, lng: -74.15, zoom: 11 },
+};
+
 const nycTabloidMapStyle: google.maps.MapTypeStyle[] = [
   { featureType: "all", elementType: "geometry", stylers: [{ color: "#1b1511" }] },
   { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#e8d8b5" }] },
@@ -140,7 +149,7 @@ function formatCategory(category: string) {
 }
 
 function offenseGroup(point: CrimeMapPoint): OffenseGroup {
-  const offense = point.offense_description.toUpperCase();
+  const offense = (point.offense_description ?? "").toUpperCase();
   if (offense.includes("ROBBERY")) return "ROBBERY";
   if (offense.includes("FORGERY") || offense.includes("FRAUD")) return "FORGERY";
   if (offense.includes("LARCENY") || offense.includes("THEFT") || offense.includes("BURGLARY") || offense.includes("STOLEN")) {
@@ -155,7 +164,16 @@ function colorForOffense(point: CrimeMapPoint): [number, number, number] {
   return OFFENSE_MARKERS[offenseGroup(point)].color;
 }
 
-export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
+const VALID_FOCUS_BOROUGHS = new Set(Object.keys(BOROUGH_FOCUS));
+
+export function CrimeMap({
+  points,
+  focusBorough,
+}: {
+  points: CrimeMapPoint[];
+  /** Uppercase borough from `/map?borough=`; filters pins and nudges the camera. */
+  focusBorough?: string | null;
+}) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID;
   const useCloudMapStyle = process.env.NEXT_PUBLIC_USE_GOOGLE_MAP_ID === "true";
@@ -168,12 +186,35 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
   const [viewMode, setViewMode] = useState<ViewMode>("density");
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
   const [selectedPoint, setSelectedPoint] = useState<CrimeMapPoint | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const [status, setStatus] = useState(apiKey ? "Loading Google Maps..." : "Google Maps API key is not configured.");
 
+  const boroughFilter = focusBorough && VALID_FOCUS_BOROUGHS.has(focusBorough) ? focusBorough : null;
+
   const filteredPoints = useMemo(
-    () => points.filter((point) => enabledSeverities.has(point.law_category?.toUpperCase())),
-    [enabledSeverities, points],
+    () =>
+      points.filter((point) => {
+        if (!enabledSeverities.has(point.law_category?.toUpperCase())) {
+          return false;
+        }
+        if (boroughFilter && point.borough?.toUpperCase() !== boroughFilter) {
+          return false;
+        }
+        return true;
+      }),
+    [boroughFilter, enabledSeverities, points],
   );
+
+  useEffect(() => {
+    if (!mapReady || !boroughFilter || !mapRef.current) {
+      return;
+    }
+    const target = BOROUGH_FOCUS[boroughFilter];
+    mapRef.current.moveCamera({
+      center: { lat: target.lat, lng: target.lng },
+      zoom: target.zoom,
+    });
+  }, [boroughFilter, mapReady]);
 
   useEffect(() => {
     if (!apiKey || !containerRef.current || mapRef.current) {
@@ -228,6 +269,7 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
         );
         mapRef.current = map;
         overlayRef.current = overlay;
+        setMapReady(true);
         setStatus("");
       })
       .catch((error: unknown) => {
@@ -237,6 +279,7 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
 
     return () => {
       cancelled = true;
+      setMapReady(false);
       boroughPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
       boroughPolygonsRef.current = [];
       overlayRef.current?.finalize();
@@ -404,6 +447,14 @@ export function CrimeMap({ points }: { points: CrimeMapPoint[] }) {
       >
         <div ref={containerRef} style={{ height: "100%", width: "100%" }} />
         <aside className="map-control-panel">
+          {boroughFilter ? (
+            <p className="map-borough-focus" style={{ margin: "0 0 0.5rem", fontSize: "0.82rem" }}>
+              Showing <strong>{boroughFilter}</strong> from URL.{" "}
+              <a href="/map" style={{ color: "inherit", fontWeight: 700 }}>
+                Clear filter
+              </a>
+            </p>
+          ) : null}
           <p className="map-panel-kicker">Layer Control</p>
           {ALL_SEVERITIES.map((severity) => (
             <label key={severity} className="map-check-row">

@@ -4,12 +4,20 @@ import { getCrimeOverview } from "../crimeOverview";
 import { CrimeDashboard } from "../../components/CrimeDashboard";
 import { LiveNewsTicker } from "../../components/LiveNewsTicker";
 
+function mastheadEditionLabel() {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone: "America/New_York",
+  }).format(new Date());
+  return `${weekday} Edition`;
+}
+
 export default async function GraphsPage() {
   const { overview, error, note } = await getCrimeOverview();
   return (
     <main className="bulletin-shell">
       <div className="bulletin-topline">
-        <span>Friday Edition</span>
+        <span>{mastheadEditionLabel()}</span>
         <span>Your daily dose of NYC almost behaving</span>
         <span>Issue 311</span>
       </div>

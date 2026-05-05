@@ -602,12 +602,19 @@ def crime_overview(
         order by totals.day
     """
     top_offense_sql = f"""
-        select offense_description, law_category, count(*) as crime_count
+        select
+          coalesce(
+            nullif(trim(offense_description), ''),
+            nullif(trim(internal_classification_description), ''),
+            nullif(trim(law_category), ''),
+            'UNSPECIFIED'
+          ) as offense_description,
+          law_category,
+          count(*) as crime_count
         from {table}
         where complaint_date between @start_date and @end_date
-          and offense_description is not null
           {borough_filter}
-        group by offense_description, law_category
+        group by 1, 2
         order by crime_count desc
         limit @top_n
     """

@@ -4,7 +4,22 @@ import { getCrimeOverview } from "../crimeOverview";
 import { CrimeDashboard } from "../../components/CrimeDashboard";
 import { LiveNewsTicker } from "../../components/LiveNewsTicker";
 
-export default async function MapPage() {
+type MapSearchParams = { borough?: string | string[] };
+
+function normalizeBoroughParam(raw: string | string[] | undefined): string | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const token = Array.isArray(raw) ? raw[0] : raw;
+  if (!token || typeof token !== "string") {
+    return undefined;
+  }
+  const one = token.toUpperCase().trim();
+  return one.length ? one : undefined;
+}
+
+export default async function MapPage({ searchParams }: { searchParams: MapSearchParams }) {
+  const focusBorough = normalizeBoroughParam(searchParams?.borough);
   const { overview, error, note } = await getCrimeOverview({ latestDayOnly: true, mapLimit: 5000 });
   return (
     <main className="bulletin-shell">
@@ -44,7 +59,7 @@ export default async function MapPage() {
       ) : null}
 
       <div className="content-stack">
-        <CrimeDashboard overview={overview} error={error} view="map" />
+        <CrimeDashboard overview={overview} error={error} view="map" mapFocusBorough={focusBorough} />
       </div>
     </main>
   );

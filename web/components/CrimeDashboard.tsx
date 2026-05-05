@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CrimeMap } from "./CrimeMap";
 import BronxImage from "./images/Bronx.png";
@@ -605,26 +606,37 @@ function RotatableRiskSpace({ rows }: { rows: DemographicBoroughRow[] }) {
   );
 }
 
-function EvidenceStringBoard({
-  demographics,
-  peakHour,
-  topBorough,
-  topOffense,
-}: {
-  demographics: DemographicBoroughRow[];
-  peakHour: HourlyDensityRow | null;
-  topBorough?: { borough: string; crimes: number };
-  topOffense?: TopOffenseRow;
-}) {
-  const highestRate = demographics.reduce<DemographicBoroughRow | null>(
-    (best, row) =>
-      !best || (row.crime_rate_per_100k ?? 0) > (best.crime_rate_per_100k ?? 0) ? row : best,
-    null,
-  );
+const DETECTIVE_BOROUGH_ORDER = [
+  "MANHATTAN",
+  "BROOKLYN",
+  "QUEENS",
+  "BRONX",
+  "STATEN ISLAND",
+] as const;
 
+const BOROUGH_DETECTIVE_FACTS: Record<(typeof DETECTIVE_BOROUGH_ORDER)[number], string> = {
+  MANHATTAN:
+    "Glass canyons amplify every siren: finance hours, theater let-out, and 3 a.m. slices share the same grid.",
+  BROOKLYN:
+    "Neighborhood logic beats borough averages—one community board's calm is another's weekend roar.",
+  QUEENS:
+    "Long boulevards and two-fare zones mean patterns stretch east while pockets stay hyper-local.",
+  BRONX:
+    "Major corridors carry the night's weight; parks and river edges tell a different tempo.",
+  "STATEN ISLAND":
+    "Ferry-and-bridge rhythms keep counts human-scaled compared to the four core boroughs.",
+};
+
+function EvidenceStringBoard({
+  byBorough,
+  demographics,
+}: {
+  byBorough: Array<{ borough: string; crimes: number }>;
+  demographics: DemographicBoroughRow[];
+}) {
   return (
     <section className="case-board evidence-board">
-      <span className="case-board-pin">Detective's wall: totals, timing, and context</span>
+      <span className="case-board-pin">Detective's wall: five borough leads</span>
       <svg aria-hidden="true" className="evidence-strings" viewBox="0 0 100 52" preserveAspectRatio="none">
         <line x1="18" x2="49" y1="11" y2="24" />
         <line x1="49" x2="82" y1="24" y2="10" />
@@ -632,49 +644,37 @@ function EvidenceStringBoard({
         <line x1="82" x2="68" y1="10" y2="42" />
         <line x1="30" x2="68" y1="42" y2="42" />
       </svg>
-      <div className="evidence-grid">
-        <article className="evidence-photo rotate-left">
-          <span className="push-pin" />
-          <img
-            alt={`${topBorough?.borough ?? "NYC"} evidence`}
-            className="photo-plate"
-            src={BOROUGH_IMAGES[topBorough?.borough ?? ""] ?? "/evidence/nyc-street.svg"}
-          />
-          <h3>{topBorough?.borough ?? "NYC"}</h3>
-          <p>Raw-count lead in the selected issue.</p>
-          <strong>{formatCompact(topBorough?.crimes)} reports</strong>
-        </article>
-        <article className="evidence-note center-note">
-          <span className="push-pin red" />
-          <p className="mini-headline">The story changes when population enters the room</p>
-          <p>
-            The case board connects volume, timing, and social context so the page reads like an
-            investigation instead of a plain dashboard.
-          </p>
-        </article>
-        <article className="evidence-photo rotate-right">
-          <span className="push-pin" />
-          <img
-            alt={`${highestRate?.borough ?? "Borough"} evidence`}
-            className="photo-plate"
-            src={BOROUGH_IMAGES[highestRate?.borough ?? ""] ?? "/evidence/borough-map.svg"}
-          />
-          <h3>{highestRate?.borough ?? "Rate view"}</h3>
-          <p>Highest population-normalized borough in the window.</p>
-          <strong>{(highestRate?.crime_rate_per_100k ?? 0).toFixed(1)} per 100k</strong>
-        </article>
-        <article className="evidence-note small">
-          <span className="push-pin red" />
-          <h4>Peak Hour</h4>
-          <p>
-            {peakHour ? `${DAY_LABELS[peakHour.day_of_week]} ${peakHour.hour}:00` : "No hour cell"}.
-          </p>
-        </article>
-        <article className="evidence-note small">
-          <span className="push-pin red" />
-          <h4>Lead Offense</h4>
-          <p>{topOffense?.offense_description ?? "No offense ranking"}.</p>
-        </article>
+      <div className="evidence-borough-strip">
+        {DETECTIVE_BOROUGH_ORDER.map((borough) => {
+          const count = byBorough.find((row) => row.borough === borough)?.crimes ?? 0;
+          const demo = demographics.find((row) => row.borough === borough);
+          const rate = demo?.crime_rate_per_100k;
+          const rateLine =
+            rate != null && Number.isFinite(rate)
+              ? `${rate.toFixed(1)} complaints per 100k residents in this window.`
+              : "Population-normalized rate not on file for this slice.";
+          return (
+            <Link
+              className="evidence-borough-card"
+              href={`/map?borough=${encodeURIComponent(borough)}`}
+              key={borough}
+              prefetch={false}
+            >
+              <span className="push-pin" />
+              <img
+                alt=""
+                className="photo-plate"
+                src={BOROUGH_IMAGES[borough] ?? "/evidence/nyc-street.svg"}
+              />
+              <h3>{borough === "STATEN ISLAND" ? "Staten Island" : borough}</h3>
+              <p className="evidence-borough-flair">{BOROUGH_DETECTIVE_FACTS[borough]}</p>
+              <p className="evidence-borough-stats">
+                <strong>{count.toLocaleString()}</strong> filings logged · {rateLine}
+              </p>
+              <span className="evidence-borough-cta">Open map room →</span>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
@@ -684,6 +684,8 @@ export function CrimeDashboard(props: {
   overview: CrimeOverviewPayload | null;
   error?: string;
   view?: DashboardView;
+  /** When set, Map Room filters to this uppercase borough (from `/map?borough=`). */
+  mapFocusBorough?: string | null;
 }) {
   if (props.error) {
     return <p style={{ color: "#b42318" }}>{props.error}</p>;
@@ -722,13 +724,22 @@ export function CrimeDashboard(props: {
     crimes: row.crime_count,
     topOffenses: row.top_offenses ?? [],
   }));
-  const offenseData = props.overview.top_offenses.map((row) => ({
-    offense:
-      row.offense_description.length > 38
-        ? `${row.offense_description.slice(0, 38)}...`
-        : row.offense_description,
-    crimes: row.crime_count,
-  }));
+  const topOffensesMapped = (props.overview.top_offenses ?? [])
+    .filter((row) => (row.offense_description ?? "").trim().length > 0)
+    .map((row) => {
+      const label = row.offense_description ?? "";
+      return {
+        offense: label.length > 38 ? `${label.slice(0, 38)}...` : label,
+        crimes: row.crime_count,
+      };
+    });
+  const offenseData =
+    topOffensesMapped.length > 0
+      ? topOffensesMapped
+      : (props.overview.by_law_category ?? []).map((row) => ({
+          offense: row.law_category ? `${row.law_category} (severity mix)` : "Unknown category",
+          crimes: row.crime_count,
+        }));
   const mapPoints = (props.overview.map_points ?? []).filter((point) => isValidBorough(point.borough));
   const topBorough = boroughData[0];
   const topOffense = props.overview.top_offenses[0];
@@ -759,7 +770,7 @@ export function CrimeDashboard(props: {
           Showing up to {mapPoints.length.toLocaleString()} geocoded events sampled from the selected
           window. Hover a dot for event context.
         </p>
-        <CrimeMap points={mapPoints} />
+        <CrimeMap focusBorough={props.mapFocusBorough} points={mapPoints} />
       </section>
       ) : null}
 
@@ -891,12 +902,7 @@ export function CrimeDashboard(props: {
         </div>
       </section>
 
-      <EvidenceStringBoard
-        demographics={demographics}
-        peakHour={peakHour}
-        topBorough={topBorough}
-        topOffense={topOffense}
-      />
+      <EvidenceStringBoard byBorough={boroughData} demographics={demographics} />
 
       <HourlyDensityPlot rows={hourlyDensity} />
 
