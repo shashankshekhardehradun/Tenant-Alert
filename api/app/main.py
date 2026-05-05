@@ -16,12 +16,14 @@ from api.app.routers import (
     news,
 )
 
-_DEFAULT_CORS_ORIGINS = (
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001",
-)
+
+def _default_local_next_origins() -> tuple[str, ...]:
+    """Next dev often hops ports (3000→3001→3002…); allow typical local origins."""
+    hosts = ("http://localhost:", "http://127.0.0.1:")
+    return tuple(f"{h}{port}" for h in hosts for port in range(3000, 3011))
+
+
+_DEFAULT_CORS_ORIGINS = _default_local_next_origins()
 
 
 def _cors_allow_origins() -> list[str]:

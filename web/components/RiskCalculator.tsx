@@ -240,7 +240,9 @@ export function RiskCalculator() {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(
         message === "Failed to fetch"
-          ? "Could not print fate receipt: API unreachable or blocked by CORS. Restart FastAPI and confirm NEXT_PUBLIC_API_URL points to it."
+          ? "Could not print fate receipt: API unreachable or blocked by CORS. Start FastAPI on port 8000 " +
+              "(restart it after git pull so CORS includes your Next dev port, e.g. 3002), and confirm " +
+              "NEXT_PUBLIC_API_URL in the repo .env matches http://localhost:8000."
           : `Could not print fate receipt: ${message}`,
       );
     }
