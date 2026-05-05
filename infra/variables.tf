@@ -61,7 +61,8 @@ variable "cors_allow_origins" {
 variable "cors_allow_origins_extra" {
   description = "Comma-separated extra CORS origins (no brackets or JSON). Appended to cors_allow_origins. Example: https://nycroulette.net,https://www.nycroulette.net — avoids PowerShell/terraform -var list parsing issues."
   type        = string
-  default     = ""
+  # Production web custom domain; override with \"\" in tfvars if this fork uses another host only.
+  default     = "https://nycroulette.net,https://www.nycroulette.net"
 }
 
 variable "cors_allow_origin_regex" {
