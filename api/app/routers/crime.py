@@ -482,7 +482,7 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
     if payload.group_context in {"solo-mission", "lone-wolf-2am"}:
         headline = f"LONE WOLF ENERGY SPIKES RISK IN {borough}"
 
-    return {
+    body: dict[str, object] = {
         "score": score,
         "raw_points_total": raw_points_total,
         "category": category,
@@ -491,7 +491,6 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
         "headline": headline,
         "borough": borough,
         "location": payload.location,
-        "model_version": "bqml-random-forest-v0.2",
         "latest_data_day": stats.get("latest_day"),
         "top_factors": top_factors,
         "receipt_lines": [
@@ -509,6 +508,7 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
             "you back from the RF layer (it only reads incident pressure, not your choices)."
         ),
     }
+    return body
 
 
 @router.get("/overview")

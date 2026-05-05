@@ -12,7 +12,6 @@ type RiskResponse = {
   headline: string;
   borough: string;
   location: string;
-  model_version: string;
   latest_data_day?: string | null;
   top_factors: Array<{ label: string; points: number; detail: string }>;
   receipt_lines: Array<{ label: string; value: number }>;
@@ -196,10 +195,25 @@ function OptionGroup({
   );
 }
 
+/** Prefer IPv4 loopback: on Windows, `localhost` may hit ::1 while uvicorn is on 127.0.0.1. */
+const DEFAULT_API = "http://127.0.0.1:8000";
+
+/** Absolute API origin; relative or empty NEXT_PUBLIC_* would otherwise hit Next (404). */
+function resolveRiskApiBase(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL;
+  const candidate = typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : DEFAULT_API;
+  if (candidate.startsWith("http://") || candidate.startsWith("https://")) {
+    return candidate.replace(/\/$/, "");
+  }
+  return DEFAULT_API.replace(/\/$/, "");
+}
+
 export function RiskCalculator() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [result, setResult] = useState<RiskResponse | null>(null);
   const [status, setStatus] = useState<string>("");
+  const apiBase = resolveRiskApiBase();
+
   const maxFactor = useMemo(
     () => Math.max(...(result?.top_factors.map((factor) => Math.abs(factor.points)) ?? [1]), 1),
     [result],
@@ -225,9 +239,10 @@ export function RiskCalculator() {
   const calculateRisk = async () => {
     setStatus("Printing receipt...");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-      const response = await fetch(`${apiUrl}/crime/risk-score`, {
+      const response = await fetch(`${apiBase}/crime/risk-score`, {
         body: JSON.stringify(form),
+        cache: "no-store",
+        credentials: "omit",
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
@@ -242,7 +257,7 @@ export function RiskCalculator() {
         message === "Failed to fetch"
           ? "Could not print fate receipt: API unreachable or blocked by CORS. Start FastAPI on port 8000 " +
               "(restart it after git pull so CORS includes your Next dev port, e.g. 3002), and confirm " +
-              "NEXT_PUBLIC_API_URL in the repo .env matches http://localhost:8000."
+              "NEXT_PUBLIC_API_URL in the repo .env is an absolute URL (e.g. http://127.0.0.1:8000)."
           : `Could not print fate receipt: ${message}`,
       );
     }
