@@ -972,6 +972,11 @@ select {
   padding-top: 0.45rem;
 }
 
+.receipt-raw-note {
+  margin: 0.15rem 0 0.5rem;
+  text-align: center;
+}
+
 .receipt-verdict {
   font-weight: 700;
   margin: 0.7rem 0 0.2rem;

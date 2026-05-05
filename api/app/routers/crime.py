@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from itertools import product
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
@@ -115,7 +116,7 @@ MODEL_WEIGHTS = {
         "bright-busy": -5,
         "rainy-empty": 8,
         "sketchy-quiet": 12,
-        "crowded-chaos": 9,
+        "crowded-chaos": 5,
         "construction-canyon": 10,
     },
     "group_context": {
@@ -133,6 +134,14 @@ MODEL_WEIGHTS = {
         "lets-see-what-happens": 16,
     },
 }
+
+# RF baseline is incident-only; caps keep "safe" chip combos from always losing to the model.
+_BASELINE_CAP = 34
+_BASELINE_K = 3.35
+_PRESSURE_SLICE_MAX = 7
+_PRESSURE_MULT = 0.92
+_RECENT_DIV = 720
+_RECENT_CAP = 5
 
 
 def _crime_table() -> str:
@@ -182,11 +191,11 @@ def crime_data_range() -> dict[str, object]:
 
 def _risk_bucket(score: int) -> tuple[str, str, str]:
     """Verdict bands on the 1–99 receipt score (same scale as the UI total)."""
-    if score < 38:
+    if score < 40:
         return ("LOW", "You're chilling", "Daytime Bubble")
-    if score < 62:
+    if score < 64:
         return ("MEDIUM", "Keep your head up", "Busy but Watchful")
-    if score < 82:
+    if score < 86:
         return ("HIGH", "Eyes up. Phone down.", "Classic NYC Chaos")
     return ("VERY HIGH", "Respectfully... go home", "Late Night Gamble Zone")
 
@@ -206,6 +215,115 @@ def _model_weight(group: str, value: str) -> int:
 
 def _factor(label: str, points: int, detail: str) -> dict[str, object]:
     return {"label": label, "points": points, "detail": detail}
+
+
+def _clamped_baseline(predicted_pressure: float) -> int:
+    return max(1, min(_BASELINE_CAP, round(predicted_pressure * _BASELINE_K)))
+
+
+def _pressure_slice(predicted_pressure: float) -> int:
+    return min(_PRESSURE_SLICE_MAX, round(predicted_pressure * _PRESSURE_MULT))
+
+
+def _recent_term(recent_14d_incidents: int) -> int:
+    return min(_RECENT_CAP, recent_14d_incidents // _RECENT_DIV)
+
+
+def _temporal_adjustment(time_range: str) -> int:
+    """Negative = safer receipt: daylight / normal-hours chips vs late-night buckets."""
+    return {
+        "sun-still-doing-its-job": -22,
+        "after-work-wander": -12,
+        "late-night-decisions": 3,
+        "you-should-probably-be-home": 9,
+    }.get(time_range, 0)
+
+
+def _witness_crowd_comfort_values(environment: str, movement: str, group_context: str) -> int:
+    """Negative = witnesses / cover / eyes on the street; can stack with env weights."""
+    n = 0
+    if environment == "bright-busy":
+        n -= 7
+    if movement == "busy-avenue":
+        n -= 5
+    if movement == "transit-hub":
+        n -= 3
+    if group_context in {"group-energy", "tour-squad"}:
+        n -= 6
+    if environment == "crowded-chaos" and group_context in {
+        "with-a-friend",
+        "pair-outing",
+        "group-energy",
+        "tour-squad",
+    }:
+        n -= 9
+    if environment == "sketchy-quiet" and group_context in {"solo-mission", "lone-wolf-2am"}:
+        n += 5
+    return n
+
+
+def _witness_crowd_comfort(payload: RiskScoreRequest) -> int:
+    return _witness_crowd_comfort_values(
+        payload.environment,
+        payload.movement,
+        payload.group_context,
+    )
+
+
+def _behavior_six_sum(payload: RiskScoreRequest) -> int:
+    return (
+        _model_weight("activity", payload.activity)
+        + _model_weight("awareness", payload.awareness)
+        + _model_weight("appearance", payload.appearance)
+        + _model_weight("environment", payload.environment)
+        + _model_weight("group_context", payload.group_context)
+        + _model_weight("chaos", payload.chaos)
+    )
+
+
+def _compute_swing_extrema() -> tuple[int, int]:
+    """Min/max of (behavior six-pack + temporal + witness) over every chip permutation."""
+    groups_six = (
+        "activity",
+        "awareness",
+        "appearance",
+        "environment",
+        "group_context",
+        "chaos",
+    )
+    key_lists = [tuple(MODEL_WEIGHTS[g]) for g in groups_six]
+    movements = tuple(MODEL_WEIGHTS["movement"])
+    times = tuple(TIME_FACTORS)
+    lo = 10**9
+    hi = -10**9
+    for bundle in product(*key_lists, movements, times):
+        six_vals, movement, time_range = bundle[:-2], bundle[-2], bundle[-1]
+        behavior = sum(
+            _model_weight(g, v) for g, v in zip(groups_six, six_vals, strict=True)
+        )
+        env_v = six_vals[3]
+        temporal = _temporal_adjustment(time_range)
+        witness = _witness_crowd_comfort_values(env_v, movement, six_vals[4])
+        total = behavior + temporal + witness
+        lo = min(lo, total)
+        hi = max(hi, total)
+    return lo, hi
+
+
+_ROUTING_WEIGHT_MIN = min(MODEL_WEIGHTS["movement"].values())
+_ROUTING_WEIGHT_MAX = max(MODEL_WEIGHTS["movement"].values())
+_CRIME_STACK_MIN = 1 + 0 + 0 + _ROUTING_WEIGHT_MIN
+_CRIME_STACK_MAX = _BASELINE_CAP + _PRESSURE_SLICE_MAX + _RECENT_CAP + _ROUTING_WEIGHT_MAX
+_SWING_MIN, _SWING_MAX = _compute_swing_extrema()
+_RAW_CALIB_MIN = _CRIME_STACK_MIN + _SWING_MIN
+_RAW_CALIB_MAX = _CRIME_STACK_MAX + _SWING_MAX
+
+
+def _calibrated_display_score(raw_points_total: int) -> int:
+    span = max(1, _RAW_CALIB_MAX - _RAW_CALIB_MIN)
+    t = (raw_points_total - _RAW_CALIB_MIN) / span
+    t = max(0.0, min(1.0, t))
+    return int(max(1, min(99, round(1 + t * 98))))
 
 
 @router.post("/risk-score")
@@ -307,30 +425,18 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
     stats = rows[0] if rows else {}
     predicted_pressure = float(stats.get("predicted_crime_pressure_score") or 0)
     recent_14d_incidents = int(stats.get("recent_14d_incidents") or 0)
-    # RF row is borough+hour; cap baseline so behavior inputs can still swing the receipt.
-    model_baseline = max(1, min(52, round(predicted_pressure * 5.5)))
-    night_factor = max(0, _model_weight("activity", payload.activity) // 4)
-    # Time-bucket flat adds stay small — hour is already baked into the BQML feature row.
-    if payload.time_range == "late-night-decisions":
-        night_factor += 9
-    elif payload.time_range == "you-should-probably-be-home":
-        night_factor += 13
-    elif payload.time_range == "after-work-wander":
-        night_factor += 5
-    crowd_density = min(12, round(predicted_pressure * 1.4)) + _model_weight(
-        "movement", payload.movement
-    )
-    recent_factor = min(8, recent_14d_incidents // 550)
-    behavior_factor = (
-        _model_weight("activity", payload.activity)
-        + _model_weight("awareness", payload.awareness)
-        + _model_weight("appearance", payload.appearance)
-        + _model_weight("environment", payload.environment)
-        + _model_weight("group_context", payload.group_context)
-        + _model_weight("chaos", payload.chaos)
-    )
-    raw_score = model_baseline + night_factor + crowd_density + recent_factor + behavior_factor
-    score = max(1, min(99, raw_score))
+    model_baseline = _clamped_baseline(predicted_pressure)
+    pressure_slice = _pressure_slice(predicted_pressure)
+    recent_factor = _recent_term(recent_14d_incidents)
+    route_context = _model_weight("movement", payload.movement)
+    crime_stack = model_baseline + pressure_slice + recent_factor + route_context
+
+    behavior_six = _behavior_six_sum(payload)
+    temporal_adj = _temporal_adjustment(payload.time_range)
+    witness_adj = _witness_crowd_comfort(payload)
+    comfort_stack = temporal_adj + witness_adj
+    raw_points_total = crime_stack + behavior_six + comfort_stack
+    score = _calibrated_display_score(raw_points_total)
     category, verdict, persona = _risk_bucket(score)
     importance_rows = service.query_safe(
         f"""
@@ -344,25 +450,33 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
         f"Random Forest predicted {predicted_pressure:.1f} "
         f"severity-weighted incidents for {borough} around {hour}:00."
     )
-    recent_detail = (
-        f"{recent_14d_incidents:,} borough incidents in the latest 14-day feature window."
-    )
     behavior_detail = (
-        "Activity, awareness, appearance, group, environment, and chaos inputs."
+        "Activity, awareness, appearance, group, environment, and chaos chips "
+        "(movement stays in the route row)."
     )
-    density_detail = "Predicted area/hour pressure plus movement context."
+    area_detail = (
+        "Rolling incident density from the RF slice plus the latest 14-day borough volume "
+        f"({recent_14d_incidents:,} incidents in that window)."
+    )
+    route_detail = "Street geometry / transit exposure separate from the BQML hour slice."
+    comfort_detail = (
+        "Daylight bucket plus extra witness cover: bright blocks, busy avenues, "
+        "transit hubs, and crowds when you are not solo. These can go negative."
+    )
     top_factors = sorted(
         [
             _factor("BQML baseline", model_baseline, baseline_detail),
-            _factor("Night factor", night_factor, f"Time range resolved near {hour}:00."),
-            _factor("Density context", crowd_density, density_detail),
-            _factor("Recent incidents", recent_factor, recent_detail),
-            _factor("Behavior/vibe", behavior_factor, behavior_detail),
+            _factor("Area window", pressure_slice + recent_factor, area_detail),
+            _factor("Route context", route_context, route_detail),
+            _factor("Daylight & witnesses", comfort_stack, comfort_detail),
+            _factor("Behavior/vibe", behavior_six, behavior_detail),
         ],
         key=lambda item: abs(int(item["points"])),
         reverse=True,
     )
-    headline = f"{payload.activity.replace('-', ' ').upper()} MEETS {borough} AFTER DARK"
+    headline = f"{payload.activity.replace('-', ' ').upper()} OUT IN {borough}"
+    if payload.time_range in {"late-night-decisions", "you-should-probably-be-home"}:
+        headline = f"{payload.activity.replace('-', ' ').upper()} MEETS {borough} AFTER HOURS"
     if payload.awareness in {"vibing-not-observing", "main-character-energy"}:
         headline = f"CONFIDENCE HIGH, AWARENESS LOW IN {borough}"
     if payload.group_context in {"solo-mission", "lone-wolf-2am"}:
@@ -370,25 +484,30 @@ def crime_risk_score(payload: RiskScoreRequest) -> dict[str, object]:
 
     return {
         "score": score,
+        "raw_points_total": raw_points_total,
         "category": category,
         "verdict": verdict,
         "persona": persona,
         "headline": headline,
         "borough": borough,
         "location": payload.location,
-        "model_version": "bqml-random-forest-v0.1",
+        "model_version": "bqml-random-forest-v0.2",
         "latest_data_day": stats.get("latest_day"),
         "top_factors": top_factors,
         "receipt_lines": [
             {"label": "BQML BASELINE", "value": model_baseline},
-            {"label": "NIGHT FACTOR", "value": night_factor},
-            {"label": "DENSITY CONTEXT", "value": crowd_density},
-            {"label": "RECENT INCIDENTS", "value": recent_factor},
-            {"label": "BEHAVIOR/VIBE", "value": behavior_factor},
+            {"label": "AREA WINDOW", "value": pressure_slice + recent_factor},
+            {"label": "ROUTE CONTEXT", "value": route_context},
+            {"label": "DAYLIGHT & WITNESSES", "value": comfort_stack},
+            {"label": "BEHAVIOR/VIBE", "value": behavior_six},
         ],
         "top_offenses": stats.get("top_offenses") or [],
         "model_feature_importance": importance_rows,
-        "tip": "Eyes up. Move with purpose. Stay boring when the block gets loud.",
+        "tip": (
+            "Receipt rows are raw points that add up to the blend; the TOTAL rescales that "
+            "blend to 1–99 using every chip permutation so daylight and crowd-cover can pull "
+            "you back from the RF layer (it only reads incident pressure, not your choices)."
+        ),
     }
 
 

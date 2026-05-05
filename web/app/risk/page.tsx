@@ -22,7 +22,7 @@ export default function RiskPage() {
         </div>
         <aside className="price-box" aria-label="Risk receipt status">
           <span>Model</span>
-          <strong>v0</strong>
+          <strong>v0.2</strong>
           <span>explainable index</span>
         </aside>
       </header>

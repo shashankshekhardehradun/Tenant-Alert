@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 
 type RiskResponse = {
   score: number;
+  /** Sum of receipt rows before scaling to 1–99 (see API tip). */
+  raw_points_total?: number;
   category: string;
   verdict: string;
   persona: string;
@@ -250,8 +252,9 @@ export function RiskCalculator() {
         <span className="section-label">Risk Calculator</span>
         <h2>Bodega Receipt of Fate</h2>
         <p className="blotter-note">
-          A tongue-in-cheek score powered by a BQML Random Forest baseline plus transparent context
-          modifiers. The model predicts historical area/time incident pressure, not personal fate.
+          A tongue-in-cheek score powered by a BQML Random Forest baseline plus transparent chips.
+          The RF only sees incident pressure; daylight, crowds, and your choices are explicit
+          modifiers, then the total is rescaled so safer permutations actually move the needle.
         </p>
         <OptionGroup label="Where are you?" name="location" options={OPTIONS.location} value={form.location} onChange={updateField} />
         <OptionGroup label="What time are you out?" name="time_range" options={OPTIONS.time_range} value={form.time_range} onChange={updateField} />
@@ -298,6 +301,11 @@ export function RiskCalculator() {
                 <span>TOTAL</span>
                 <strong>{result.score}</strong>
               </p>
+              {typeof result.raw_points_total === "number" ? (
+                <p className="blotter-note receipt-raw-note">
+                  Raw blend {result.raw_points_total} → scaled {result.score} (see Why This Score)
+                </p>
+              ) : null}
               <p className="receipt-verdict">VERDICT:</p>
               <blockquote>"{result.verdict}"</blockquote>
               <p className="receipt-persona">You are currently in: {result.persona}</p>
