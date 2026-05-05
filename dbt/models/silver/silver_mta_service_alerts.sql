@@ -26,7 +26,12 @@ with base as (
 expanded as (
     select
       *,
-      trim(raw_route_id) as route_id
+      -- Express trains (6X, 7X) use a route_id not in the static map; collapse to base line.
+      case
+        when mode = 'subway' and regexp_contains(trim(raw_route_id), r'^[0-9]+X$')
+          then regexp_replace(trim(raw_route_id), r'X$', '')
+        else trim(raw_route_id)
+      end as route_id
     from base,
     unnest(split(coalesce(route_ids, ''), ',')) as raw_route_id
 ),
@@ -56,7 +61,8 @@ route_borough_map as (
     select '6', 'MANHATTAN' union all select '6', 'BRONX' union all
     select '7', 'MANHATTAN' union all select '7', 'QUEENS' union all
     select 'S', 'MANHATTAN' union all select 'FS', 'BROOKLYN' union all
-    select 'GS', 'MANHATTAN' union all select 'SIR', 'STATEN ISLAND'
+    select 'GS', 'MANHATTAN' union all select 'SIR', 'STATEN ISLAND' union all
+    select 'SI', 'STATEN ISLAND'
 ),
 
 bus_borough_map as (

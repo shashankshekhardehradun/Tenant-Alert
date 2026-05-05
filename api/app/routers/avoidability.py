@@ -46,6 +46,8 @@ def avoidability_rankings(
           late_night_pressure_score,
           transit_chaos_score,
           transit_alert_count,
+          subway_alert_count,
+          bus_alert_count,
           affected_route_count,
           avoidability_score,
           avoidability_band,

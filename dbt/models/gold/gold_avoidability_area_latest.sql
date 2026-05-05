@@ -71,7 +71,7 @@ street_rollup as (
       sum(count_7d) as street_signal_count_7d,
       round(avg(spike_ratio), 2) as avg_spike_ratio,
       round(avg(open_ratio), 2) as open_ratio,
-      least(55, round(sum(category_score))) as street_signal_score,
+      least(45, round(sum(category_score))) as street_signal_score,
       array_agg(
         struct(
           signal_category as category,
@@ -106,7 +106,7 @@ crime_rollup as (
 crime_scored as (
     select
       *,
-      round(35 * safe_divide(crime_count_90d, max(crime_count_90d) over ())) as crime_pressure_score,
+      round(28 * safe_divide(crime_count_90d, max(crime_count_90d) over ())) as crime_pressure_score,
       round(
         10 * safe_divide(late_night_crime_count_90d, nullif(crime_count_90d, 0))
       ) as late_night_pressure_score
@@ -123,6 +123,8 @@ transit_rollup as (
       alerts.borough_hint as borough,
       max(alerts.snapshot_date) as latest_mta_day,
       count(distinct alerts.alert_id) as transit_alert_count,
+      count(distinct case when alerts.mode = 'subway' then alerts.alert_id end) as subway_alert_count,
+      count(distinct case when alerts.mode = 'bus' then alerts.alert_id end) as bus_alert_count,
       count(distinct alerts.route_id) as affected_route_count,
       least(20, round(sum(alerts.alert_weight) / 2)) as transit_chaos_score,
       array_agg(
@@ -133,7 +135,10 @@ transit_rollup as (
           alerts.header_text as header_text,
           alerts.alert_weight as alert_weight
         )
-        order by alerts.alert_weight desc, alerts.updated_at_ts desc nulls last
+        order by
+          case alerts.mode when 'subway' then 0 when 'bus' then 1 else 2 end,
+          alerts.alert_weight desc,
+          alerts.updated_at_ts desc nulls last
         limit 1
       )[offset(0)] as top_transit_alert
     from {{ ref('silver_mta_service_alerts') }} as alerts
@@ -157,6 +162,8 @@ combined as (
       coalesce(crime.late_night_pressure_score, 0) as late_night_pressure_score,
       coalesce(transit.transit_chaos_score, 0) as transit_chaos_score,
       coalesce(transit.transit_alert_count, 0) as transit_alert_count,
+      coalesce(transit.subway_alert_count, 0) as subway_alert_count,
+      coalesce(transit.bus_alert_count, 0) as bus_alert_count,
       coalesce(transit.affected_route_count, 0) as affected_route_count,
       street.signal_options[
         safe_offset(
@@ -181,6 +188,38 @@ combined as (
     full outer join crime_scored as crime using (borough)
     full outer join transit_rollup as transit
       on transit.borough = coalesce(street.borough, crime.borough)
+),
+
+with_raw as (
+  select
+    *,
+    crime_pressure_score + late_night_pressure_score + street_signal_score + transit_chaos_score
+      as raw_avoidability
+  from combined
+),
+
+with_window as (
+  select
+    *,
+    min(raw_avoidability) over () as min_raw,
+    max(raw_avoidability) over () as max_raw
+  from with_raw
+),
+
+scored as (
+  select
+    *,
+    case
+      when max_raw > min_raw then greatest(
+        38,
+        least(
+          96,
+          cast(round(38 + 58 * safe_divide(raw_avoidability - min_raw, max_raw - min_raw)) as int64)
+        )
+      )
+      else greatest(52, least(72, 62 + mod(abs(farm_fingerprint(borough)), 9) - 4))
+    end as avoidability_score
+  from with_window
 )
 
 select
@@ -199,34 +238,14 @@ select
   late_night_pressure_score,
   transit_chaos_score,
   transit_alert_count,
+  subway_alert_count,
+  bus_alert_count,
   affected_route_count,
-  least(
-    99,
-    cast(
-      round(
-        crime_pressure_score
-        + late_night_pressure_score
-        + street_signal_score
-        + transit_chaos_score
-      ) as int64
-    )
-  ) as avoidability_score,
+  avoidability_score,
   case
-    when least(
-      99,
-      crime_pressure_score + late_night_pressure_score + street_signal_score + transit_chaos_score
-    ) >= 82
-      then 'I would avoid'
-    when least(
-      99,
-      crime_pressure_score + late_night_pressure_score + street_signal_score + transit_chaos_score
-    ) >= 62
-      then 'Questionable vibes'
-    when least(
-      99,
-      crime_pressure_score + late_night_pressure_score + street_signal_score + transit_chaos_score
-    ) >= 38
-      then 'Keep it moving'
+    when avoidability_score >= 82 then 'I would avoid'
+    when avoidability_score >= 62 then 'Questionable vibes'
+    when avoidability_score >= 38 then 'Keep it moving'
     else 'Probably fine'
   end as avoidability_band,
   top_signal.category as top_signal_category,
@@ -288,5 +307,5 @@ select
     )
   end as advice_copy,
   current_timestamp() as built_at
-from combined
+from scored
 where borough is not null

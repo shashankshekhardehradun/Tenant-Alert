@@ -17,6 +17,8 @@ type AvoidabilityItem = {
   late_night_pressure_score?: number | null;
   transit_chaos_score?: number | null;
   transit_alert_count?: number | null;
+  subway_alert_count?: number | null;
+  bus_alert_count?: number | null;
   affected_route_count?: number | null;
   avoidability_score?: number | null;
   avoidability_band?: string | null;
@@ -95,7 +97,7 @@ export default async function AvoidPage() {
     <main className="bulletin-shell avoid-page">
       <div className="bulletin-topline">
         <span>Bad Idea Desk</span>
-        <span>311 street signals + historical pressure</span>
+        <span>311 + NYPD pressure + MTA subway and bus alerts</span>
         <span>Daily watchlist</span>
       </div>
       <header className="masthead">
@@ -103,9 +105,10 @@ export default async function AvoidPage() {
           <p className="kicker">Tonight's Friend Text</p>
           <h1 className="masthead-title">I Would Avoid</h1>
           <p className="masthead-deck">
-            A tongue-in-cheek daily watchlist blending fresh 311 street-signal complaints with
-            historical NYPD pressure. Not a safety advisory. More like your most dramatic friend
-            checking the block before you leave.
+            A tongue-in-cheek daily watchlist blending fresh 311 street-signal complaints,
+            historical NYPD pressure, and same-day MTA subway and bus service alerts (mapped into
+            boroughs by route). Not a safety advisory. More like your most dramatic friend checking
+            the block before you leave.
           </p>
         </div>
         <aside className="price-box" aria-label="Avoidability leader">
@@ -171,6 +174,13 @@ export default async function AvoidPage() {
                   <strong>{formatNumber(item.transit_alert_count)}</strong>
                   <em>{formatNumber(item.affected_route_count)} routes</em>
                 </div>
+                <div>
+                  <span>Subway vs bus</span>
+                  <strong>
+                    {formatNumber(item.subway_alert_count)} / {formatNumber(item.bus_alert_count)}
+                  </strong>
+                  <em>distinct alert IDs (latest MTA pull)</em>
+                </div>
               </div>
               <div className="classified-item">
                 Top signal: {item.top_complaint_type ?? item.top_signal_category ?? "street signal"}
@@ -194,7 +204,8 @@ export default async function AvoidPage() {
           <p>
             NYPD complaint data can lag, so the watchlist uses it as a historical pressure baseline
             and lets daily 311 street signals provide freshness: noise, parking chaos, dark lights,
-            grime, street conditions, and public-space calls.
+            grime, street conditions, and public-space calls. MTA JSON feeds include both subway and
+            bus; routes are mapped to boroughs (express trains like 6X roll up to their parent line).
           </p>
         </section>
       </div>
